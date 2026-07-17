@@ -1,0 +1,923 @@
+<html>
+<body>
+    
+<style>
+    body {
+        padding: 1%;
+    }
+    .font {
+        font-size: 16px;
+        font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif
+    }
+    input[type=button] {
+        font-size: 16px;
+        font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+        margin: 2px 0px;
+    }
+    input[type=text] {
+        font-size: 16px;
+        font-family: Garamond, serif;
+        padding: 2px 4px;
+        margin: 4px;
+    }
+    .width100 {
+        width: 100px;
+    }
+    .width200 {
+        width: 200px;
+    }
+    .width400 {
+        width: 400px;
+    }
+    table,td {
+        padding-left: 8px;
+        padding-right: 8px;
+        padding-top: 4px;
+        padding-bottom: 4px;
+        text-align: left;
+        border: 1px solid black;
+        border-collapse: collapse;
+    }
+    td {
+        white-space: nowrap;
+    }
+    th {
+        padding-left: 8px;
+        padding-right: 8px;
+        padding-top: 4px;
+        text-align: left;
+        border: 1px solid black;
+        border-collapse: collapse;
+        vertical-align: top;
+    }
+    .info {
+        font-size: 16px;
+        font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+        line-height: 1.5;
+    }
+</style>
+
+<form id="form" class="font">Masses [m₁,m₂,...,mₙ] = <input type="text" class="width400" value="[1,1,1,1,1,1,1,1]"> with n = <input type="text" class="width100" value="8"><br>
+Charges [q₁,q₂,...,qₙ] = <input type="text" class="width400" value="[4,5,6,7,8,-1,-2,-3]"><br>
+Initial positions [x₁(0),y₁(0),z₁(0),...,xₙ(0),yₙ(0),zₙ(0)] = <input type="text" class="width400" value="[1,1,1,-1,1,-1,1,-1,-1,-1,-1,1,-1,-1,-1,1,-1,1,-1,1,1,1,1,-1]"><br>
+Initial velocities [x₁′(0),y₁′(0),z₁′(0),...,xₙ′(0),yₙ′(0),zₙ′(0)] = <input type="text" class="width400" value="[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]"><br>
+Number of steps within one tᵢ = <input type="text" class="width100" value="1200"><br>
+Distance between successive tᵢ = <input type="text" class="width200" value="0.0000004"><br>
+Calculation rate = <input type="text" class="width100" value="2000"> steps per <input type="text" class="width100" value="0.5"> seconds<br><br>
+<input type="button" onclick="run()" value="Run" style="font-weight: bold;"> <input type="button" onclick="stop()" value="Stop" style="font-weight: bold;"> <input type="button" onclick="clean()" value="Clear" style="font-weight: bold;"> <input id="tablebutton" type="button" onclick="tabletoggle()" value="Hide table" style="font-weight: bold;">
+<select class="font" style="font-size: 12px;"><option value="no">Point charges move according to the electric field only</option><option value="yes">Point charges move according to both the electric and magnetic fields</option></select></form>
+
+<hr color=black size=1px><p id="info" class="info"></p>
+
+<p id="stats" class="font"></p>
+
+<div id="achart" style="width:100%;height:800px"></div><br>
+
+<form id="settings" class="font">Field render bounding cube centred at [x<sub>c</sub>,y<sub>c</sub>,z<sub>c</sub>] = <input type="text" class="width400" value="[0,0,0]"><br>Side length = <input type="text" class="width200" value="4">   Number of samples along each side = <input type="text" class="width100" value="16"><br>Cone size = <input type="text" class="width100" value="0.25">   Colour scale: <select class="font"><option value="plasma">Plasma (0,1)</option><option value="darkerplasma">Darker plasma (1/3,1)</option><option value="concentratedplasma">Concentrated plasma (1/3,4/5)</option><option value="inferno">Inferno (0,1)</option><option value="darkerinferno">Darker inferno (1/4,1)</option><option value="concentratedinferno" selected>Concentrated inferno (1/4,5/6)</option><option value="magma">Magma (0,1)</option><option value="darkermagma">Darker magma (2/5,1)</option><option value="concentratedmagma">Concentrated magma (2/5,5/7)</option></select></form>
+
+<table id="table" class="font"></table>
+
+<p id="debug" class="font"></p>
+
+<script src='https://cdn.plot.ly/plotly-2.24.1.min.js'></script>
+    
+<script>
+    
+    considerbfield = 0
+    e0 = "(8.854187*10**(-12))"
+    m0 = "(1.256637*10**(-6))"
+    k0 = 1/(4*Math.PI*eval(e0))
+    G = "(6.6743*10**(-11))"
+    charges = []
+    masses = []
+    d = 0.1
+    n = 20
+    s = 1000
+    y0 = [2,0]
+    h = 0.0001
+    N = 48
+    expr = "y"
+    fprevious = []
+    ystart = []
+    running = 0
+    fixed = 0
+    iterations = 0
+    stepsonce = 1000
+    superscripts = ["¹","²","³","⁴","⁵","⁶","⁷","⁸","⁹","¹⁰","¹¹","¹²","¹³","¹⁴","¹⁵","¹⁶","¹⁷","¹⁸","¹⁹","²⁰","²¹","²²","²³","²⁴","²⁵","²⁶","²⁷","²⁸","²⁹","³⁰","³¹","³²","³³","³⁴","³⁵","³⁶","³⁷","³⁸","³⁹","⁴⁰","⁴¹","⁴²","⁴³","⁴⁴","⁴⁵","⁴⁶","⁴⁷","⁴⁸","⁴⁹","⁵⁰","⁵¹","⁵²","⁵³","⁵⁴","⁵⁵","⁵⁶","⁵⁷","⁵⁸","⁵⁹","⁶⁰","⁶¹","⁶²","⁶³","⁶⁴","⁶⁵","⁶⁶","⁶⁷","⁶⁸","⁶⁹","⁷⁰","⁷¹","⁷²","⁷³","⁷⁴","⁷⁵","⁷⁶","⁷⁷","⁷⁸","⁷⁹","⁸⁰","⁸¹","⁸²","⁸³","⁸⁴","⁸⁵","⁸⁶","⁸⁷","⁸⁸","⁸⁹","⁹⁰","⁹¹","⁹²","⁹³","⁹⁴","⁹⁵","⁹⁶","⁹⁷","⁹⁸","⁹⁹"]
+    subscripts = ["₁","₂","₃","₄","₅","₆","₇","₈","₉","₁₀","₁₁","₁₂","₁₃","₁₄","₁₅","₁₆","₁₇","₁₈","₁₉","₂₀","₂₁","₂₂","₂₃","₂₄","₂₅","₂₆","₂₇","₂₈","₂₉","₃₀","₃₁","₃₂","₃₃","₃₄","₃₅","₃₆","₃₇","₃₈","₃₉","₄₀","₄₁","₄₂","₄₃","₄₄","₄₅","₄₆","₄₇","₄₈","₄₉","₅₀","₅₁","₅₂","₅₃","₅₄","₅₅","₅₆","₅₇","₅₈","₅₉","₆₀","₆₁","₆₂","₆₃","₆₄","₆₅","₆₆","₆₇","₆₈","₆₉","₇₀","₇₁","₇₂","₇₃","₇₄","₇₅","₇₆","₇₇","₇₈","₇₉","₈₀","₈₁","₈₂","₈₃","₈₄","₈₅","₈₆","₈₇","₈₈","₈₉","₉₀","₉₁","₉₂","₉₃","₉₄","₉₅","₉₆","₉₇","₉₈","₉₉"]
+    colours = ['0,158,242,1','255,77,125,1','0,196,195,1','255,157,0,1','167,70,255,1','58,134,255,1','131,56,236,1','255,0,110,1','251,86,7,1','255,190,11,1','38,70,83,1','42,157,143,1','233,196,106,1','244,162,97,1','231,111,81,1','0,245,212,1','0,187,249,1','254,228,64,1','241,91,181,1','155,93,229,1','228,193,249,1','169,222,249,1','208,244,222,1','252,246,189,1','255,153,200,1','7,59,76,1','17,138,178,1','6,214,160,1','255,209,102,1','239,71,111,1','0,129,167,1','0,175,185,1','253,252,220,1','254,217,183,1','240,113,103,1','112,214,255,1','255,112,166,1','255,151,112,1','255,214,112,1','233,255,112,1','128,155,206,1','149,184,209,1','184,224,210,1','214,234,223,1','234,196,213,1','51,92,103,1','255,243,176,1','224,159,62,1','158,42,43,1','84,11,14,1','114,63,184,1','47,132,4,1','198,37,153,1','230,12,62,1','183,231,193,1','164,136,175,1','59,178,185,1','2,21,140,1','67,85,139,1','3,162,240,1','219,21,20,1','195,109,60,1','148,55,50,1','41,48,195,1','186,54,177,1','232,161,238,1','89,228,166,1','21,243,234,1','111,182,185,1','0,158,50,1','238,144,54,1','14,152,170,1','118,218,121,1','143,85,178,1','153,199,166,1','88,199,85,1','44,228,193,1','160,155,250,1','181,32,44,1','98,198,227,1','210,14,184,1','77,86,25,1','88,229,200,1','177,40,53,1','126,211,22,1','46,159,214,1','8,194,174,1','101,142,13,1','160,114,238,1','205,40,186,1','121,217,34,1','52,184,149,1','3,105,43,1','186,9,161,1','158,69,255,1','258,215,244,1','31,32,109,1','174,218,160,1','200,249,164,1','65,180,150,1']
+    plasma = "[[0,'rgb(13,8,135)'],[0.0196,'rgb(27,6,141)'],[0.0392,'rgb(38,5,146)'],[0.0588,'rgb(48,5,150)'],[0.0784,'rgb(57,4,154)'],[0.098,'rgb(65,4,158)'],[0.1176,'rgb(73,3,161)'],[0.1373,'rgb(82,2,163)'],[0.1569,'rgb(90,1,165)'],[0.1765,'rgb(98,0,167)'],[0.1961,'rgb(105,0,168)'],[0.2157,'rgb(113,0,169)'],[0.2353,'rgb(121,1,169)'],[0.2549,'rgb(128,4,168)'],[0.2745,'rgb(136,7,167)'],[0.2941,'rgb(143,12,165)'],[0.3137,'rgb(150,18,162)'],[0.3333,'rgb(156,23,159)'],[0.3529,'rgb(163,29,155)'],[0.3725,'rgb(169,34,151)'],[0.3922,'rgb(175,40,146)'],[0.4118,'rgb(181,46,142)'],[0.4314,'rgb(186,51,137)'],[0.451,'rgb(192,57,132)'],[0.4706,'rgb(197,63,128)'],[0.4902,'rgb(202,68,123)'],[0.5098,'rgb(206,74,118)'],[0.5294,'rgb(211,80,114)'],[0.549,'rgb(215,85,109)'],[0.5686,'rgb(219,91,105)'],[0.5882,'rgb(223,97,101)'],[0.6078,'rgb(227,103,96)'],[0.6275,'rgb(231,109,92)'],[0.6471,'rgb(234,115,88)'],[0.6667,'rgb(238,121,83)'],[0.6863,'rgb(241,127,79)'],[0.7059,'rgb(244,134,75)'],[0.7255,'rgb(246,140,70)'],[0.7451,'rgb(248,147,66)'],[0.7647,'rgb(250,154,62)'],[0.7843,'rgb(252,161,57)'],[0.8039,'rgb(253,168,53)'],[0.8235,'rgb(254,176,49)'],[0.8431,'rgb(255,183,45)'],[0.8627,'rgb(255,191,42)'],[0.8824,'rgb(254,199,39)'],[0.902,'rgb(253,207,37)'],[0.9216,'rgb(252,216,36)'],[0.9412,'rgb(249,224,37)'],[0.9608,'rgb(247,232,38)'],[0.9804,'rgb(244,241,39)'],[1,'rgb(241,250,34)']]"
+    darkerplasma = "[[0,'rgb(0,0,0)'],[0.3333,'rgb(13,8,135)'],[0.3464,'rgb(27,6,141)'],[0.3595,'rgb(38,5,146)'],[0.3725,'rgb(48,5,150)'],[0.3856,'rgb(57,4,154)'],[0.3987,'rgb(65,4,158)'],[0.4118,'rgb(73,3,161)'],[0.4248,'rgb(82,2,163)'],[0.4379,'rgb(90,1,165)'],[0.451,'rgb(98,0,167)'],[0.4641,'rgb(105,0,168)'],[0.4771,'rgb(113,0,169)'],[0.4902,'rgb(121,1,169)'],[0.5033,'rgb(128,4,168)'],[0.5163,'rgb(136,7,167)'],[0.5294,'rgb(143,12,165)'],[0.5425,'rgb(150,18,162)'],[0.5556,'rgb(156,23,159)'],[0.5686,'rgb(163,29,155)'],[0.5817,'rgb(169,34,151)'],[0.5948,'rgb(175,40,146)'],[0.6078,'rgb(181,46,142)'],[0.6209,'rgb(186,51,137)'],[0.634,'rgb(192,57,132)'],[0.6471,'rgb(197,63,128)'],[0.6601,'rgb(202,68,123)'],[0.6732,'rgb(206,74,118)'],[0.6863,'rgb(211,80,114)'],[0.6993,'rgb(215,85,109)'],[0.7124,'rgb(219,91,105)'],[0.7255,'rgb(223,97,101)'],[0.7386,'rgb(227,103,96)'],[0.7516,'rgb(231,109,92)'],[0.7647,'rgb(234,115,88)'],[0.7778,'rgb(238,121,83)'],[0.7908,'rgb(241,127,79)'],[0.8039,'rgb(244,134,75)'],[0.817,'rgb(246,140,70)'],[0.8301,'rgb(248,147,66)'],[0.8431,'rgb(250,154,62)'],[0.8562,'rgb(252,161,57)'],[0.8693,'rgb(253,168,53)'],[0.8824,'rgb(254,176,49)'],[0.8954,'rgb(255,183,45)'],[0.9085,'rgb(255,191,42)'],[0.9216,'rgb(254,199,39)'],[0.9346,'rgb(253,207,37)'],[0.9477,'rgb(252,216,36)'],[0.9608,'rgb(249,224,37)'],[0.9739,'rgb(247,232,38)'],[0.9869,'rgb(244,241,39)'],[1,'rgb(241,250,34)']]"
+    concentratedplasma = "[[0,'rgb(0,0,0)'],[0.3333,'rgb(13,8,135)'],[0.3425,'rgb(27,6,141)'],[0.3516,'rgb(38,5,146)'],[0.3608,'rgb(48,5,150)'],[0.3699,'rgb(57,4,154)'],[0.3791,'rgb(65,4,158)'],[0.3882,'rgb(73,3,161)'],[0.3974,'rgb(82,2,163)'],[0.4065,'rgb(90,1,165)'],[0.4157,'rgb(98,0,167)'],[0.4248,'rgb(105,0,168)'],[0.434,'rgb(113,0,169)'],[0.4431,'rgb(121,1,169)'],[0.4523,'rgb(128,4,168)'],[0.4614,'rgb(136,7,167)'],[0.4706,'rgb(143,12,165)'],[0.4797,'rgb(150,18,162)'],[0.4889,'rgb(156,23,159)'],[0.498,'rgb(163,29,155)'],[0.5072,'rgb(169,34,151)'],[0.5163,'rgb(175,40,146)'],[0.5255,'rgb(181,46,142)'],[0.5346,'rgb(186,51,137)'],[0.5438,'rgb(192,57,132)'],[0.5529,'rgb(197,63,128)'],[0.5621,'rgb(202,68,123)'],[0.5712,'rgb(206,74,118)'],[0.5804,'rgb(211,80,114)'],[0.5895,'rgb(215,85,109)'],[0.5987,'rgb(219,91,105)'],[0.6078,'rgb(223,97,101)'],[0.617,'rgb(227,103,96)'],[0.6261,'rgb(231,109,92)'],[0.6353,'rgb(234,115,88)'],[0.6444,'rgb(238,121,83)'],[0.6536,'rgb(241,127,79)'],[0.6627,'rgb(244,134,75)'],[0.6719,'rgb(246,140,70)'],[0.681,'rgb(248,147,66)'],[0.6902,'rgb(250,154,62)'],[0.6993,'rgb(252,161,57)'],[0.7085,'rgb(253,168,53)'],[0.7176,'rgb(254,176,49)'],[0.7268,'rgb(255,183,45)'],[0.7359,'rgb(255,191,42)'],[0.7451,'rgb(254,199,39)'],[0.7542,'rgb(253,207,37)'],[0.7634,'rgb(252,216,36)'],[0.7725,'rgb(249,224,37)'],[0.7817,'rgb(247,232,38)'],[0.7908,'rgb(244,241,39)'],[0.8,'rgb(241,250,34)'],[1,'rgb(255,255,255)']]"
+    inferno = "[[0,'rgb(0,0,4)'],[0.0196,'rgb(2,2,12)'],[0.0392,'rgb(5,4,23)'],[0.0588,'rgb(10,7,34)'],[0.0784,'rgb(16,9,45)'],[0.098,'rgb(22,11,58)'],[0.1176,'rgb(30,12,70)'],[0.1373,'rgb(38,12,81)'],[0.1569,'rgb(47,10,91)'],[0.1765,'rgb(56,9,98)'],[0.1961,'rgb(64,10,103)'],[0.2157,'rgb(73,11,107)'],[0.2353,'rgb(81,14,109)'],[0.2549,'rgb(89,17,110)'],[0.2745,'rgb(97,20,111)'],[0.2941,'rgb(105,23,111)'],[0.3137,'rgb(113,25,110)'],[0.3333,'rgb(121,28,110)'],[0.3529,'rgb(129,31,108)'],[0.3725,'rgb(137,34,107)'],[0.3922,'rgb(145,37,105)'],[0.4118,'rgb(153,40,102)'],[0.4314,'rgb(161,43,99)'],[0.451,'rgb(169,46,95)'],[0.4706,'rgb(176,49,92)'],[0.4902,'rgb(184,53,87)'],[0.5098,'rgb(191,57,83)'],[0.5294,'rgb(198,61,78)'],[0.549,'rgb(205,66,72)'],[0.5686,'rgb(212,72,67)'],[0.5882,'rgb(218,77,61)'],[0.6078,'rgb(224,84,56)'],[0.6275,'rgb(229,90,50)'],[0.6471,'rgb(234,98,43)'],[0.6667,'rgb(238,105,37)'],[0.6863,'rgb(242,113,31)'],[0.7059,'rgb(245,122,24)'],[0.7255,'rgb(248,130,18)'],[0.7451,'rgb(250,139,11)'],[0.7647,'rgb(251,148,7)'],[0.7843,'rgb(252,158,7)'],[0.8039,'rgb(253,167,12)'],[0.8235,'rgb(253,177,20)'],[0.8431,'rgb(252,186,31)'],[0.8627,'rgb(251,196,43)'],[0.8824,'rgb(249,206,56)'],[0.902,'rgb(247,216,70)'],[0.9216,'rgb(244,226,86)'],[0.9412,'rgb(243,235,105)'],[0.9608,'rgb(243,243,126)'],[0.9804,'rgb(246,250,146)'],[1,'rgb(253,256,165)']]"
+    darkerinferno = "[[0,'rgb(0,0,0)'],[0.25,'rgb(0,0,4)'],[0.2647,'rgb(2,2,12)'],[0.2794,'rgb(5,4,23)'],[0.2941,'rgb(10,7,34)'],[0.3088,'rgb(16,9,45)'],[0.3235,'rgb(22,11,58)'],[0.3382,'rgb(30,12,70)'],[0.3529,'rgb(38,12,81)'],[0.3676,'rgb(47,10,91)'],[0.3824,'rgb(56,9,98)'],[0.3971,'rgb(64,10,103)'],[0.4118,'rgb(73,11,107)'],[0.4265,'rgb(81,14,109)'],[0.4412,'rgb(89,17,110)'],[0.4559,'rgb(97,20,111)'],[0.4706,'rgb(105,23,111)'],[0.4853,'rgb(113,25,110)'],[0.5,'rgb(121,28,110)'],[0.5147,'rgb(129,31,108)'],[0.5294,'rgb(137,34,107)'],[0.5441,'rgb(145,37,105)'],[0.5588,'rgb(153,40,102)'],[0.5735,'rgb(161,43,99)'],[0.5882,'rgb(169,46,95)'],[0.6029,'rgb(176,49,92)'],[0.6176,'rgb(184,53,87)'],[0.6324,'rgb(191,57,83)'],[0.6471,'rgb(198,61,78)'],[0.6618,'rgb(205,66,72)'],[0.6765,'rgb(212,72,67)'],[0.6912,'rgb(218,77,61)'],[0.7059,'rgb(224,84,56)'],[0.7206,'rgb(229,90,50)'],[0.7353,'rgb(234,98,43)'],[0.75,'rgb(238,105,37)'],[0.7647,'rgb(242,113,31)'],[0.7794,'rgb(245,122,24)'],[0.7941,'rgb(248,130,18)'],[0.8088,'rgb(250,139,11)'],[0.8235,'rgb(251,148,7)'],[0.8382,'rgb(252,158,7)'],[0.8529,'rgb(253,167,12)'],[0.8676,'rgb(253,177,20)'],[0.8824,'rgb(252,186,31)'],[0.8971,'rgb(251,196,43)'],[0.9118,'rgb(249,206,56)'],[0.9265,'rgb(247,216,70)'],[0.9412,'rgb(244,226,86)'],[0.9559,'rgb(243,235,105)'],[0.9706,'rgb(243,243,126)'],[0.9853,'rgb(246,250,146)'],[1,'rgb(253,256,165)']]"
+    concentratedinferno = "[[0,'rgb(0,0,0)'],[0.25,'rgb(0,0,4)'],[0.2614,'rgb(2,2,12)'],[0.2729,'rgb(5,4,23)'],[0.2843,'rgb(10,7,34)'],[0.2958,'rgb(16,9,45)'],[0.3072,'rgb(22,11,58)'],[0.3186,'rgb(30,12,70)'],[0.3301,'rgb(38,12,81)'],[0.3415,'rgb(47,10,91)'],[0.3529,'rgb(56,9,98)'],[0.3644,'rgb(64,10,103)'],[0.3758,'rgb(73,11,107)'],[0.3873,'rgb(81,14,109)'],[0.3987,'rgb(89,17,110)'],[0.4101,'rgb(97,20,111)'],[0.4216,'rgb(105,23,111)'],[0.433,'rgb(113,25,110)'],[0.4444,'rgb(121,28,110)'],[0.4559,'rgb(129,31,108)'],[0.4673,'rgb(137,34,107)'],[0.4788,'rgb(145,37,105)'],[0.4902,'rgb(153,40,102)'],[0.5016,'rgb(161,43,99)'],[0.5131,'rgb(169,46,95)'],[0.5245,'rgb(176,49,92)'],[0.5359,'rgb(184,53,87)'],[0.5474,'rgb(191,57,83)'],[0.5588,'rgb(198,61,78)'],[0.5703,'rgb(205,66,72)'],[0.5817,'rgb(212,72,67)'],[0.5931,'rgb(218,77,61)'],[0.6046,'rgb(224,84,56)'],[0.616,'rgb(229,90,50)'],[0.6275,'rgb(234,98,43)'],[0.6389,'rgb(238,105,37)'],[0.6503,'rgb(242,113,31)'],[0.6618,'rgb(245,122,24)'],[0.6732,'rgb(248,130,18)'],[0.6846,'rgb(250,139,11)'],[0.6961,'rgb(251,148,7)'],[0.7075,'rgb(252,158,7)'],[0.719,'rgb(253,167,12)'],[0.7304,'rgb(253,177,20)'],[0.7418,'rgb(252,186,31)'],[0.7533,'rgb(251,196,43)'],[0.7647,'rgb(249,206,56)'],[0.7761,'rgb(247,216,70)'],[0.7876,'rgb(244,226,86)'],[0.799,'rgb(243,235,105)'],[0.8105,'rgb(243,243,126)'],[0.8219,'rgb(246,250,146)'],[0.8333,'rgb(253,256,165)'],[1,'rgb(255,255,255)']]"
+    magma = "[[0,'rgb(0,0,4)'],[0.0196,'rgb(2,2,12)'],[0.0392,'rgb(5,4,22)'],[0.0588,'rgb(9,7,32)'],[0.0784,'rgb(14,11,43)'],[0.098,'rgb(20,14,54)'],[0.1176,'rgb(26,16,66)'],[0.1373,'rgb(33,17,78)'],[0.1569,'rgb(41,17,90)'],[0.1765,'rgb(49,17,101)'],[0.1961,'rgb(58,15,111)'],[0.2157,'rgb(66,15,117)'],[0.2353,'rgb(75,17,122)'],[0.2549,'rgb(83,19,125)'],[0.2745,'rgb(91,22,127)'],[0.2941,'rgb(98,25,128)'],[0.3137,'rgb(106,28,129)'],[0.3333,'rgb(114,31,130)'],[0.3529,'rgb(122,34,130)'],[0.3725,'rgb(130,37,130)'],[0.3922,'rgb(138,40,130)'],[0.4118,'rgb(146,43,129)'],[0.4314,'rgb(154,46,128)'],[0.451,'rgb(162,48,127)'],[0.4706,'rgb(170,51,125)'],[0.4902,'rgb(178,53,123)'],[0.5098,'rgb(187,56,121)'],[0.5294,'rgb(195,59,118)'],[0.549,'rgb(203,63,115)'],[0.5686,'rgb(211,66,111)'],[0.5882,'rgb(218,71,107)'],[0.6078,'rgb(225,76,103)'],[0.6275,'rgb(231,82,99)'],[0.6471,'rgb(237,89,96)'],[0.6667,'rgb(242,97,93)'],[0.6863,'rgb(245,105,92)'],[0.7059,'rgb(248,114,92)'],[0.7255,'rgb(250,124,94)'],[0.7451,'rgb(252,133,96)'],[0.7647,'rgb(253,143,100)'],[0.7843,'rgb(254,152,105)'],[0.8039,'rgb(255,162,111)'],[0.8235,'rgb(255,171,117)'],[0.8431,'rgb(255,180,124)'],[0.8627,'rgb(255,190,131)'],[0.8824,'rgb(255,199,139)'],[0.902,'rgb(255,208,147)'],[0.9216,'rgb(255,217,155)'],[0.9412,'rgb(254,226,164)'],[0.9608,'rgb(254,236,173)'],[0.9804,'rgb(253,245,182)'],[1,'rgb(253,254,192)']]"
+    darkermagma = "[[0,'rgb(0,0,0)'],[0.4,'rgb(0,0,4)'],[0.4118,'rgb(2,2,12)'],[0.4235,'rgb(5,4,22)'],[0.4353,'rgb(9,7,32)'],[0.4471,'rgb(14,11,43)'],[0.4588,'rgb(20,14,54)'],[0.4706,'rgb(26,16,66)'],[0.4824,'rgb(33,17,78)'],[0.4941,'rgb(41,17,90)'],[0.5059,'rgb(49,17,101)'],[0.5176,'rgb(58,15,111)'],[0.5294,'rgb(66,15,117)'],[0.5412,'rgb(75,17,122)'],[0.5529,'rgb(83,19,125)'],[0.5647,'rgb(91,22,127)'],[0.5765,'rgb(98,25,128)'],[0.5882,'rgb(106,28,129)'],[0.6,'rgb(114,31,130)'],[0.6118,'rgb(122,34,130)'],[0.6235,'rgb(130,37,130)'],[0.6353,'rgb(138,40,130)'],[0.6471,'rgb(146,43,129)'],[0.6588,'rgb(154,46,128)'],[0.6706,'rgb(162,48,127)'],[0.6824,'rgb(170,51,125)'],[0.6941,'rgb(178,53,123)'],[0.7059,'rgb(187,56,121)'],[0.7176,'rgb(195,59,118)'],[0.7294,'rgb(203,63,115)'],[0.7412,'rgb(211,66,111)'],[0.7529,'rgb(218,71,107)'],[0.7647,'rgb(225,76,103)'],[0.7765,'rgb(231,82,99)'],[0.7882,'rgb(237,89,96)'],[0.8,'rgb(242,97,93)'],[0.8118,'rgb(245,105,92)'],[0.8235,'rgb(248,114,92)'],[0.8353,'rgb(250,124,94)'],[0.8471,'rgb(252,133,96)'],[0.8588,'rgb(253,143,100)'],[0.8706,'rgb(254,152,105)'],[0.8824,'rgb(255,162,111)'],[0.8941,'rgb(255,171,117)'],[0.9059,'rgb(255,180,124)'],[0.9176,'rgb(255,190,131)'],[0.9294,'rgb(255,199,139)'],[0.9412,'rgb(255,208,147)'],[0.9529,'rgb(255,217,155)'],[0.9647,'rgb(254,226,164)'],[0.9765,'rgb(254,236,173)'],[0.9882,'rgb(253,245,182)'],[1,'rgb(253,254,192)']]"
+    concentratedmagma = "[[0,'rgb(0,0,0)'],[0.4,'rgb(0,0,4)'],[0.4062,'rgb(2,2,12)'],[0.4123,'rgb(5,4,22)'],[0.4185,'rgb(9,7,32)'],[0.4246,'rgb(14,11,43)'],[0.4308,'rgb(20,14,54)'],[0.437,'rgb(26,16,66)'],[0.4431,'rgb(33,17,78)'],[0.4493,'rgb(41,17,90)'],[0.4555,'rgb(49,17,101)'],[0.4616,'rgb(58,15,111)'],[0.4678,'rgb(66,15,117)'],[0.4739,'rgb(75,17,122)'],[0.4801,'rgb(83,19,125)'],[0.4863,'rgb(91,22,127)'],[0.4924,'rgb(98,25,128)'],[0.4986,'rgb(106,28,129)'],[0.5048,'rgb(114,31,130)'],[0.5109,'rgb(122,34,130)'],[0.5171,'rgb(130,37,130)'],[0.5232,'rgb(138,40,130)'],[0.5294,'rgb(146,43,129)'],[0.5356,'rgb(154,46,128)'],[0.5417,'rgb(162,48,127)'],[0.5479,'rgb(170,51,125)'],[0.5541,'rgb(178,53,123)'],[0.5602,'rgb(187,56,121)'],[0.5664,'rgb(195,59,118)'],[0.5725,'rgb(203,63,115)'],[0.5787,'rgb(211,66,111)'],[0.5849,'rgb(218,71,107)'],[0.591,'rgb(225,76,103)'],[0.5972,'rgb(231,82,99)'],[0.6034,'rgb(237,89,96)'],[0.6095,'rgb(242,97,93)'],[0.6157,'rgb(245,105,92)'],[0.6218,'rgb(248,114,92)'],[0.628,'rgb(250,124,94)'],[0.6342,'rgb(252,133,96)'],[0.6403,'rgb(253,143,100)'],[0.6465,'rgb(254,152,105)'],[0.6527,'rgb(255,162,111)'],[0.6588,'rgb(255,171,117)'],[0.665,'rgb(255,180,124)'],[0.6711,'rgb(255,190,131)'],[0.6773,'rgb(255,199,139)'],[0.6835,'rgb(255,208,147)'],[0.6896,'rgb(255,217,155)'],[0.6958,'rgb(254,226,164)'],[0.702,'rgb(254,236,173)'],[0.7081,'rgb(253,245,182)'],[0.7143,'rgb(253,254,192)'],[1,'rgb(255,255,255)']]"
+    layoutt0 = {xaxis:{title:'t',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},exponentformat:'e',showexponent:'all'},yaxis:{tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},exponentformat:'e',showexponent:'all'},legend:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:14}}}
+    layoutxy = {xaxis:{title:'x',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},exponentformat:'e',showexponent:'all'},
+    yaxis:{title:'y',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},exponentformat:'e',showexponent:'all'},legend:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:14}}}
+    layoutyz = {xaxis:{title:'y',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},exponentformat:'e',showexponent:'all'},
+    yaxis:{title:'z',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},exponentformat:'e',showexponent:'all'},legend:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:14}}}
+    layoutzx = {xaxis:{title:'z',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},exponentformat:'e',showexponent:'all'},
+    yaxis:{title:'x',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},exponentformat:'e',showexponent:'all'},legend:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:14}}}
+    layoutxyz = {scene:{xaxis:{title:'x',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:12},exponentformat:'e',showexponent:'all'},
+    yaxis:{title:'y',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:12},exponentformat:'e',showexponent:'all'},zaxis:{title:'z',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:12},exponentformat:'e',showexponent:'all'}},legend:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:14}}}
+    layoutfield = {scene:{xaxis:{title:'x',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:12},exponentformat:'e',showexponent:'all'},
+    yaxis:{title:'y',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:12},exponentformat:'e',showexponent:'all'},zaxis:{title:'z',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:12},exponentformat:'e',showexponent:'all'}},legend:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:14}},paper_bgcolor:'rgb(0,0,0)',plot_bgcolor:'rgb(0,0,0)'}
+    
+    function g(t,y) {
+        return eval(expr)
+    }
+    
+    function u(xyz,ith) {
+        return (ith-1)*3+xyz-1
+    }
+    
+    function tabletoggle() {
+        hidden = document.getElementById("table").getAttribute("hidden")
+        if (hidden) {
+            document.getElementById("table").removeAttribute("hidden")
+            document.getElementById("tablebutton").value = "Hide table"
+        } else {
+            document.getElementById("table").setAttribute("hidden","hidden")
+            document.getElementById("tablebutton").value = "Show table"
+        }
+    }
+    
+    document.getElementById("settings").setAttribute("hidden","hidden")
+    
+    function classicfourthorderrungekuttamethod(h,ti,yi) {
+        k1 = g(ti,yi)
+        hk1 = k1.map(x => (h/2)*x);
+        yi1 = yi.map(function (num, idx) {return num + hk1[idx];});
+        k2 = g(ti+h/2,yi1)
+        hk2 = k2.map(x => (h/2)*x);
+        yi2 = yi.map(function (num, idx) {return num + hk2[idx];});
+        k3 = g(ti+h/2,yi2)
+        hk3 = k3.map(x => h*x);
+        yi3 = yi.map(function (num, idx) {return num + hk3[idx];});
+        k4 = g(ti+h,yi3)
+        k2m = k2.map(x => 2*x);
+        k3m = k3.map(x => 2*x);
+        kt = k1.map(function (num, idx) {return num + k2m[idx] + k3m[idx] + k4[idx];});
+        kth = kt.map(x => (h/6)*x);
+        ans = yi.map(function (num, idx) {return num + kth[idx];});
+        return ans
+    }
+    
+    function eighthorderadamsbashforthmethod(h,ti,yi) {
+        f0m = fprevious[0].map(x => (16083/4480)*x);
+        f1m = fprevious[1].map(x => (-1152169/120960)*x);
+        f2m = fprevious[2].map(x => (242653/13440)*x);
+        f3m = fprevious[3].map(x => (-296053/13440)*x);
+        f4m = fprevious[4].map(x => (2102243/120960)*x);
+        f5m = fprevious[5].map(x => (-115747/13440)*x);
+        f6m = fprevious[6].map(x => (32863/13440)*x);
+        f7m = fprevious[7].map(x => (-5257/17280)*x);
+        fm = f0m.map(function (num, idx) {return num + f1m[idx] + f2m[idx] + f3m[idx] + f4m[idx] + f5m[idx] + f6m[idx] + f7m[idx];});
+        fmh = fm.map(x => h*x);
+        ans = yi.map(function (num, idx) {return num + fmh[idx];});
+        return ans
+    }
+    
+    function plot(c) {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        yvalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4))
+            yvalues.push(document.getElementById("table").rows[i].cells[c+2].innerHTML)
+        }
+        data = [{
+            x: xvalues,
+            y: yvalues,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: derivative(c+1,0),
+            marker: {
+                color: 'rgba(' + colours[c] + ')'
+            },
+            line: {
+                color: 'rgba(' + colours[c] + ')',
+                shape: 'spline',
+                smoothness: 0.5
+            }
+        },{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}]
+        Plotly.newPlot("achart",data,eval(layoutt0))
+    }
+    
+    function plotxy(c) {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        yvalues = []
+        tvalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[c+2].innerHTML)
+            yvalues.push(document.getElementById("table").rows[i].cells[c+3].innerHTML)
+            tvalues.push("at t = " + document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4))
+        }
+        data = [{
+            x: xvalues,
+            y: yvalues,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: '(' + derivative(c+1,0) + ',' + derivative(c+2,0) + ')',
+            text: tvalues,
+            marker: {
+                color: 'rgba(' + colours[c/3] + ')'
+            },
+            line: {
+                color: 'rgba(' + colours[c/3] + ')',
+                shape: 'spline',
+                smoothness: 0.5
+            }
+        },{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}]
+        Plotly.newPlot("achart",data,eval(layoutxy))
+    }
+    
+    function plotyz(c) {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        yvalues = []
+        tvalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[c+2].innerHTML)
+            yvalues.push(document.getElementById("table").rows[i].cells[c+3].innerHTML)
+            tvalues.push("at t = " + document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4))
+        }
+        data = [{
+            x: xvalues,
+            y: yvalues,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: '(' + derivative(c+1,0) + ',' + derivative(c+2,0) + ')',
+            text: tvalues,
+            marker: {
+                color: 'rgba(' + colours[(c-1)/3] + ')'
+            },
+            line: {
+                color: 'rgba(' + colours[(c-1)/3] + ')',
+                shape: 'spline',
+                smoothness: 0.5
+            }
+        },{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}]
+        Plotly.newPlot("achart",data,eval(layoutyz))
+    }
+    
+    function plotzx(c) {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        yvalues = []
+        tvalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[c+2].innerHTML)
+            yvalues.push(document.getElementById("table").rows[i].cells[c].innerHTML)
+            tvalues.push("at t = " + document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4))
+        }
+        data = [{
+            x: xvalues,
+            y: yvalues,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: '(' + derivative(c+1,0) + ',' + derivative(c-1,0) + ')',
+            text: tvalues,
+            marker: {
+                color: 'rgba(' + colours[(c-2)/3] + ')'
+            },
+            line: {
+                color: 'rgba(' + colours[(c-2)/3] + ')',
+                shape: 'spline',
+                smoothness: 0.5
+            }
+        },{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}]
+        Plotly.newPlot("achart",data,eval(layoutzx))
+    }
+    
+    function plotxyz(c) {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        yvalues = []
+        zvalues = []
+        tvalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[c+2].innerHTML)
+            yvalues.push(document.getElementById("table").rows[i].cells[c+3].innerHTML)
+            zvalues.push(document.getElementById("table").rows[i].cells[c+4].innerHTML)
+            tvalues.push("at t = " + document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4))
+        }
+        data = [{
+            x: xvalues,
+            y: yvalues,
+            z: zvalues,
+            type: 'scatter3d',
+            mode: 'lines+markers',
+            name: '(' + derivative(c+1,0) + ',' + derivative(c+2,0) + ',' + derivative(c+3,0) + ')',
+            text: tvalues,
+            marker: {
+                color: 'rgba(' + colours[c/3] + ')', size: 2
+            },
+            line: {
+                color: 'rgba(' + colours[c/3] + ')'
+            }
+        }]
+        Plotly.newPlot("achart",data,eval(layoutxy))
+    }
+    
+    function plotall() {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4))
+        }
+        data = []
+        for (c=0;c<=N*3/2-1;c++) {
+            yvalues = []
+            for (j=1;j<=points;j++) {
+                yvalues.push(document.getElementById("table").rows[j].cells[c+2].innerHTML)
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],type: 'scatter',mode: 'lines+markers',name: '" + derivative(c+1,0) + "',marker: {color: 'rgba(" + colours[c] + ")'},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        data.push("{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}")
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutt0))
+    }
+    
+    function plotallxy() {
+        points = document.getElementById("table").rows.length - 1
+        data = []
+        tvalues = []
+        for (i=1;i<=points;i++) {
+            tvalues.push("\'at t = " + document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4) + "\'")
+        }
+        for (c=0;c<=N/2-1;c++) {
+            xvalues = []
+            yvalues = []
+            for (j=1;j<=points;j++) {
+                xvalues.push(document.getElementById("table").rows[j].cells[3*c+2].innerHTML)
+                yvalues.push(document.getElementById("table").rows[j].cells[3*c+3].innerHTML)
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],text: [" + tvalues + "],type: 'scatter',mode: 'lines+markers',name: '(" + derivative(3*c+1,0) + "," + derivative(3*c+2,0) + ")',marker: {color: 'rgba(" + colours[c] + ")'},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        data.push("{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}")
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutxy))
+    }
+    
+    function plotallyz() {
+        points = document.getElementById("table").rows.length - 1
+        data = []
+        tvalues = []
+        for (i=1;i<=points;i++) {
+            tvalues.push("\'at t = " + document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4) + "\'")
+        }
+        for (c=0;c<=N/2-1;c++) {
+            xvalues = []
+            yvalues = []
+            for (j=1;j<=points;j++) {
+                xvalues.push(document.getElementById("table").rows[j].cells[3*c+3].innerHTML)
+                yvalues.push(document.getElementById("table").rows[j].cells[3*c+4].innerHTML)
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],text: [" + tvalues + "],type: 'scatter',mode: 'lines+markers',name: '(" + derivative(3*c+2,0) + "," + derivative(3*c+3,0) + ")',marker: {color: 'rgba(" + colours[c] + ")'},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        data.push("{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}")
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutyz))
+    }
+    
+    function plotallzx() {
+        points = document.getElementById("table").rows.length - 1
+        data = []
+        tvalues = []
+        for (i=1;i<=points;i++) {
+            tvalues.push("\'at t = " + document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4) + "\'")
+        }
+        for (c=0;c<=N/2-1;c++) {
+            xvalues = []
+            yvalues = []
+            for (j=1;j<=points;j++) {
+                xvalues.push(document.getElementById("table").rows[j].cells[3*c+4].innerHTML)
+                yvalues.push(document.getElementById("table").rows[j].cells[3*c+2].innerHTML)
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],text: [" + tvalues + "],type: 'scatter',mode: 'lines+markers',name: '(" + derivative(3*c+3,0) + "," + derivative(3*c+1,0) + ")',marker: {color: 'rgba(" + colours[c] + ")'},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        data.push("{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}")
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutzx))
+    }
+    
+    function plotallxyz() {
+        points = document.getElementById("table").rows.length - 1
+        data = []
+        tvalues = []
+        for (i=1;i<=points;i++) {
+            tvalues.push("\'at t = " + document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4) + "\'")
+        }
+        for (c=0;c<=N/6-1;c++) {
+            xvalues = []
+            yvalues = []
+            zvalues = []
+            for (j=1;j<=points;j++) {
+                xvalues.push(document.getElementById("table").rows[j].cells[3*c+2].innerHTML)
+                yvalues.push(document.getElementById("table").rows[j].cells[3*c+3].innerHTML)
+                zvalues.push(document.getElementById("table").rows[j].cells[3*c+4].innerHTML)
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],z: [" + zvalues + "],text: [" + tvalues + "],type: 'scatter3d',mode: 'lines+markers',name: '(" + derivative(3*c+1,0) + "," + derivative(3*c+2,0) + "," + derivative(3*c+3,0) + ")',marker: {color: 'rgba(" + colours[c] + ")',size:2},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutxyz))
+    }
+    
+    function plotallxyzvelocities() {
+        points = document.getElementById("table").rows.length - 1
+        data = []
+        tvalues = []
+        for (i=1;i<=points;i++) {
+            tvalues.push("\'at t = " + document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4) + "\'")
+        }
+        for (c=N/6;c<=N/3-1;c++) {
+            xvalues = []
+            yvalues = []
+            zvalues = []
+            for (j=1;j<=points;j++) {
+                xvalues.push(document.getElementById("table").rows[j].cells[3*c+2].innerHTML)
+                yvalues.push(document.getElementById("table").rows[j].cells[3*c+3].innerHTML)
+                zvalues.push(document.getElementById("table").rows[j].cells[3*c+4].innerHTML)
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],z: [" + zvalues + "],text: [" + tvalues + "],type: 'scatter3d',mode: 'lines+markers',name: '(" + derivative(3*c+1,0) + "," + derivative(3*c+2,0) + "," + derivative(3*c+3,0) + ")',marker: {color: 'rgba(" + colours[c] + ")',size:2},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutxyz))
+    }
+    
+    function plotallxyzaccelerations() {
+        points = document.getElementById("table").rows.length - 1
+        data = []
+        tvalues = []
+        for (i=1;i<=points;i++) {
+            tvalues.push("\'at t = " + document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4) + "\'")
+        }
+        for (c=N/3;c<=N/2-1;c++) {
+            xvalues = []
+            yvalues = []
+            zvalues = []
+            for (j=1;j<=points;j++) {
+                xvalues.push(document.getElementById("table").rows[j].cells[3*c+2].innerHTML)
+                yvalues.push(document.getElementById("table").rows[j].cells[3*c+3].innerHTML)
+                zvalues.push(document.getElementById("table").rows[j].cells[3*c+4].innerHTML)
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],z: [" + zvalues + "],text: [" + tvalues + "],type: 'scatter3d',mode: 'lines+markers',name: '(" + derivative(3*c+1,0) + "," + derivative(3*c+2,0) + "," + derivative(3*c+3,0) + ")',marker: {color: 'rgba(" + colours[c] + ")',size:2},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutxyz))
+    }
+    
+    function plote() {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        evalues = []
+        kevalues = []
+        epevalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4))
+            ke = 0
+            for (j=0;j<=N/6-1;j++) {
+                ke += (1/2)*masses[j]*(eval(document.getElementById("table").rows[i].cells[N/2+3*j+2].innerHTML)**2+eval(document.getElementById("table").rows[i].cells[N/2+3*j+3].innerHTML)**2+eval(document.getElementById("table").rows[i].cells[N/2+3*j+4].innerHTML)**2)
+            }
+            kevalues.push(ke)
+            epe = 0
+            for (j=0;j<=N/6-1;j++) {
+                for (k=j+1;k<=N/6-1;k++) {
+                    epe += eval(k0)*charges[j]*charges[k]/((eval(document.getElementById("table").rows[i].cells[3*j+2].innerHTML)-eval(document.getElementById("table").rows[i].cells[3*k+2].innerHTML))**2+(eval(document.getElementById("table").rows[i].cells[3*j+3].innerHTML)-eval(document.getElementById("table").rows[i].cells[3*k+3].innerHTML))**2+(eval(document.getElementById("table").rows[i].cells[3*j+4].innerHTML)-eval(document.getElementById("table").rows[i].cells[3*k+4].innerHTML))**2)**(1/2)
+                }
+            }
+            epevalues.push(epe)
+            evalues.push(ke+epe)
+        }
+        data = [{x: xvalues,y: evalues,type: 'scatter',mode: 'lines+markers',name: 'E',marker: {color: 'rgba(' + colours[0] + ')'},line: {color: 'rgba(' + colours[0] + ')',shape: 'spline',smoothness: 0.5}},
+        {x: xvalues,y: kevalues,type: 'scatter',mode: 'lines+markers',name: 'KE',marker: {color: 'rgba(' + colours[1] + ')'},line: {color: 'rgba(' + colours[1] + ')',shape: 'spline',smoothness: 0.5}},
+        {x: xvalues,y: epevalues,type: 'scatter',mode: 'lines+markers',name: 'EPE<sub>system</sub>',marker: {color: 'rgba(' + colours[2] + ')'},line: {color: 'rgba(' + colours[2] + ')',shape: 'spline',smoothness: 0.5}},
+        {x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}]
+        Plotly.newPlot("achart",data,eval(layoutt0))
+    }
+    
+    function plotei() {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4))
+        }
+        data = []
+        for (c=0;c<N/6;c++) {
+            yvalues = []
+            for (j=1;j<=points;j++) {
+                epe = 0
+                for (k=0;k<=N/6-1;k++) {
+                    if (c!=k) {
+                        epe += eval(k0)*charges[c]*charges[k]/((eval(document.getElementById("table").rows[j].cells[3*c+2].innerHTML)-eval(document.getElementById("table").rows[j].cells[3*k+2].innerHTML))**2+(eval(document.getElementById("table").rows[j].cells[3*c+3].innerHTML)-eval(document.getElementById("table").rows[j].cells[3*k+3].innerHTML))**2+(eval(document.getElementById("table").rows[j].cells[3*c+4].innerHTML)-eval(document.getElementById("table").rows[j].cells[3*k+4].innerHTML))**2)**(1/2)
+                    }
+                }
+                ke = (1/2)*masses[c]*(eval(document.getElementById("table").rows[j].cells[N/2+3*c+2].innerHTML)**2+eval(document.getElementById("table").rows[j].cells[N/2+3*c+3].innerHTML)**2+eval(document.getElementById("table").rows[j].cells[N/2+3*c+4].innerHTML)**2)
+                yvalues.push(ke+epe)
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],type: 'scatter',mode: 'lines+markers',name: 'E" + subscripts[c] + "',marker: {color: 'rgba(" + colours[c] + ")'},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        data.push("{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}")
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutt0))
+    }
+    
+    function plotkei() {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4))
+        }
+        data = []
+        for (c=0;c<N/6;c++) {
+            yvalues = []
+            for (j=1;j<=points;j++) {
+                yvalues.push((1/2)*masses[c]*(eval(document.getElementById("table").rows[j].cells[N/2+3*c+2].innerHTML)**2+eval(document.getElementById("table").rows[j].cells[N/2+3*c+3].innerHTML)**2+eval(document.getElementById("table").rows[j].cells[N/2+3*c+4].innerHTML)**2))
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],type: 'scatter',mode: 'lines+markers',name: 'KE" + subscripts[c] + "',marker: {color: 'rgba(" + colours[c] + ")'},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        data.push("{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}")
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutt0))
+    }
+    
+    function plotepei() {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[1].innerHTML.slice(document.getElementById("table").rows[i].cells[1].innerHTML.indexOf("B\">")+4))
+        }
+        data = []
+        for (c=0;c<N/6;c++) {
+            yvalues = []
+            for (j=1;j<=points;j++) {
+                epe = 0
+                for (k=0;k<=N/6-1;k++) {
+                    if (c!=k) {
+                        epe += eval(k0)*charges[c]*charges[k]/((eval(document.getElementById("table").rows[j].cells[3*c+2].innerHTML)-eval(document.getElementById("table").rows[j].cells[3*k+2].innerHTML))**2+(eval(document.getElementById("table").rows[j].cells[3*c+3].innerHTML)-eval(document.getElementById("table").rows[j].cells[3*k+3].innerHTML))**2+(eval(document.getElementById("table").rows[j].cells[3*c+4].innerHTML)-eval(document.getElementById("table").rows[j].cells[3*k+4].innerHTML))**2)**(1/2)
+                    }
+                }
+                yvalues.push(epe)
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],type: 'scatter',mode: 'lines+markers',name: 'EPE" + subscripts[c] + "',marker: {color: 'rgba(" + colours[c] + ")'},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        data.push("{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}")
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutt0))
+    }
+    
+    function derivative(i,nth) {
+        j = (i-1)%(N/2)
+        if (i%3==1) {
+            str = "x" + subscripts[j/3]
+        }
+        if (i%3==2) {
+            str = "y" + subscripts[(j-1)/3]
+        }
+        if (i%3==0) {
+            str = "z" + subscripts[(j-2)/3]
+        }
+        if (i<=N/2) {
+            return str
+        } else if (i<=N) {
+            return str + "′"
+        } else {
+            return str + "″"
+        }
+    }
+    
+    function createexpr(mass) {
+        string = "["
+        for (i=1;i<=N/6;i++) {
+            string += "y[u(1," + (N/6+i) + ")],y[u(2," + (N/6+i) + ")],y[u(3," + (N/6+i) + ")],"
+        }
+        for (i=1;i<=N/6;i++) {
+            for (x=1;x<=3;x++) {
+                string += "(" + charges[i-1] + "/" + masses[i-1] + ")*(1/(4*Math.PI*" + e0 + ")*("
+                for (j=1;j<=N/6;j++) {
+                    if (i!=j) {
+                        string += charges[j-1] + "*(" + hatdiffexpr(i,j,x) + ")/" + interdistexpr(i,j) + "**2+"
+                    }
+                }
+                string = string.slice(0,-1)
+                string += ")"
+                if (considerbfield=="yes") {
+                    string += "+" + m0 + "/(4*Math.PI)*" + vbexpr(i,x)
+                }
+                string += "),"
+            }
+        }
+        string = string.slice(0,-1)
+        string += "]"
+        return string
+    }
+    
+    function cross(a1,a2,a3,b1,b2,b3,coord) {
+        if (coord==1) {
+            return (a2*b3-a3*b2)
+        } else if (coord==2) {
+            return (a3*b1-a1*b3)
+        } else {
+            return (a1*b2-a2*b1)
+        }
+    }
+    
+    function hat(vx,vy,vz,coord) {
+        if (vx==0&&vy==0&&vz==0) {
+            return [0,0,0]
+        } else {
+            length = dist(vx,vy,vz)
+            list = [vx/length,vy/length,vz/length]
+            return list[coord-1]
+        }
+    }
+    
+    function hatdiffexpr(i,j,coord) {
+        return "hat(y[u(1," + i + ")]-y[u(1," + j + ")],y[u(2," + i + ")]-y[u(2," + j + ")],y[u(3," + i + ")]-y[u(3," + j + ")]," + coord + ")"
+    }
+    
+    function dist(vx,vy,vz) {
+        return (vx**2+vy**2+vz**2)**(1/2)
+    }
+    
+    function interdistexpr(i,j) {
+        return "dist(y[u(1," + i + ")]-y[u(1," + j + ")],y[u(2," + i + ")]-y[u(2," + j + ")],y[u(3," + i + ")]-y[u(3," + j + ")])"
+    }
+    
+    function vrexpr(i,j,coord) {
+        return "cross(y[u(1," + (N/6+j) + ")],y[u(2," + (N/6+j) + ")],y[u(3," + (N/6+j) + ")]," + hatdiffexpr(i,j,1) + "," + hatdiffexpr(i,j,2) + "," + hatdiffexpr(i,j,3) + "," + coord + ")"
+    }
+    
+    function singlebfieldexpr(i,j,coord) {
+        return charges[j-1] + "*" + vrexpr(i,j,coord) + "/" + interdistexpr(i,j) + "**2"
+    }
+    
+    function bfieldexpr(i,coord) {
+        string = ""
+        for (j=1;j<=N/6;j++) {
+            if (i!=j) {
+                string += singlebfieldexpr(i,j,coord) + "+"
+            }
+        }
+        string = string.slice(0,-1)
+        return string
+    }
+    
+    function vbexpr(i,coord) {
+        return "cross(y[u(1," + (N/6+i) + ")],y[u(2," + (N/6+i) + ")],y[u(3," + (N/6+i) + ")]," + bfieldexpr(i,1) + "," + bfieldexpr(i,2) + "," + bfieldexpr(i,3) + "," + coord + ")"
+    }
+    
+    function findefield(px,py,pz,chargepositions,numberofcharges,coord) {
+        efieldxoryorz = 0
+        for (j=0;j<numberofcharges;j++) {
+            efieldxoryorz += eval(k0)*charges[j]*hat(px-chargepositions[3*j],py-chargepositions[3*j+1],pz-chargepositions[3*j+2],coord)/((px-chargepositions[3*j])**2+(py-chargepositions[3*j+1])**2+(pz-chargepositions[3*j+2])**2)
+        }
+        return efieldxoryorz
+    }
+    
+    function findbfield(px,py,pz,chargepositions,chargevelocities,numberofcharges,coord) {
+        bfieldxoryorz = 0
+        for (j=0;j<numberofcharges;j++) {
+            vr = cross(chargevelocities[3*j],chargevelocities[3*j+1],chargevelocities[3*j+2],hat(px-chargepositions[3*j],py-chargepositions[3*j+1],pz-chargepositions[3*j+2],1),hat(px-chargepositions[3*j],py-chargepositions[3*j+1],pz-chargepositions[3*j+2],2),hat(px-chargepositions[3*j],py-chargepositions[3*j+1],pz-chargepositions[3*j+2],3),coord)
+            bfieldxoryorz += (eval(m0)/(4*Math.PI))*charges[j]*vr/((px-chargepositions[3*j])**2+(py-chargepositions[3*j+1])**2+(pz-chargepositions[3*j+2])**2)
+        }
+        return bfieldxoryorz
+    }
+    
+    function scaling(ut,vt,wt) {
+        vectorlength = (ut**2+vt**2+wt**2)**(1/2)
+        return scalingfunction(vectorlength)
+    }
+    
+    function scalingfunction(x) {
+        return (1000+Math.log(x))/(1000*x)
+    }
+    
+    function plotefield(c) {
+        chargepos = []
+        boundingbox = eval(document.getElementById("settings").elements[0].value)
+        sidelength = eval(document.getElementById("settings").elements[1].value)
+        numberofsamples = eval(document.getElementById("settings").elements[2].value)
+        conesize = eval(document.getElementById("settings").elements[3].value)
+        xa = boundingbox[0]-sidelength/2
+        xb = boundingbox[0]+sidelength/2
+        ya = boundingbox[1]-sidelength/2
+        yb = boundingbox[1]+sidelength/2
+        za = boundingbox[2]-sidelength/2
+        zb = boundingbox[2]+sidelength/2
+        nx = numberofsamples
+        ny = numberofsamples
+        nz = numberofsamples
+        xvalues = []
+        yvalues = []
+        zvalues = []
+        uvalues = []
+        vvalues = []
+        wvalues = []
+        textvalues = []
+        name = document.getElementById("table").rows[c+1].cells[1].innerHTML.slice(document.getElementById("table").rows[c+1].cells[1].innerHTML.indexOf("B\">")+4)
+        runningmin = 10**300
+        runningmax = -1
+        for (i=0;i<N/2;i++) {
+            chargepos.push(document.getElementById("table").rows[c+1].cells[i+2].innerHTML)
+        }
+        for (posx=xa;posx<(xb+(xb-xa)/(nx-1)/2);posx+=((xb-xa)/(nx-1))) {
+            for (posy=ya;posy<(yb+(yb-ya)/(ny-1)/2);posy+=((yb-ya)/(ny-1))) {
+                for (posz=za;posz<(zb+(zb-za)/(nz-1)/2);posz+=((zb-za)/(nz-1))) {
+                    xvalues.push(posx)
+                    yvalues.push(posy)
+                    zvalues.push(posz)
+                    utemp = findefield(posx,posy,posz,chargepos,N/6,1)
+                    vtemp = findefield(posx,posy,posz,chargepos,N/6,2)
+                    wtemp = findefield(posx,posy,posz,chargepos,N/6,3)
+                    scalefactor = scaling(utemp,vtemp,wtemp)
+                    uvalues.push(scalefactor*utemp)
+                    vvalues.push(scalefactor*vtemp)
+                    wvalues.push(scalefactor*wtemp)
+                    estrength = (utemp**2+vtemp**2+wtemp**2)**(1/2)
+                    textvalues.push("\'<br>E<sub>x</sub> = " + utemp + "<br>E<sub>y</sub> = " + vtemp + "<br>E<sub>z</sub> = " + wtemp + "<br>|E| = " + estrength + "<br>log(E) = " + Math.log10(estrength) + "<br>at t = " + name + "\'")
+                    runningmin = Math.min(estrength,runningmin)
+                    runningmax = Math.max(estrength,runningmax)
+                }
+            }
+        }
+        scaleddiff = (scalingfunction(runningmax)*runningmax-scalingfunction(runningmin)*runningmin)
+        diff = runningmax/runningmin
+        tickvalsvalues = []
+        ticktextvalues = []
+        for (i=0;i<=1;i+=1/8) {
+            tickvalsvalues.push(scalingfunction(runningmin)*runningmin+i*scaleddiff)
+            ticktextvalues.push("\' " + runningmin*diff**i + "<br> (" + Math.log10(runningmin*diff**i) + ")\'")
+        }
+        data = "[{type: 'cone', x:[" + xvalues + "], y:[" + yvalues + "], z:[" + zvalues + "], u:[" + uvalues + "], v:[" + vvalues + "], w:[" + wvalues + "], text:[" + textvalues + "], sizemode:'scaled', sizeref:" + conesize + ", colorscale:" + eval(document.getElementById("settings").elements[4].value) + ", hoverinfo:'x+y+z+text', colorbar:{tickvals:[" + tickvalsvalues + "],ticktext:[" + ticktextvalues + "]}}]"
+        Plotly.newPlot("achart",eval(data),eval(layoutfield))
+    }
+    
+    function plotbfield(c) {
+        chargepos = []
+        chargevelo = []
+        boundingbox = eval(document.getElementById("settings").elements[0].value)
+        sidelength = eval(document.getElementById("settings").elements[1].value)
+        numberofsamples = eval(document.getElementById("settings").elements[2].value)
+        conesize = eval(document.getElementById("settings").elements[3].value)
+        xa = boundingbox[0]-sidelength/2
+        xb = boundingbox[0]+sidelength/2
+        ya = boundingbox[1]-sidelength/2
+        yb = boundingbox[1]+sidelength/2
+        za = boundingbox[2]-sidelength/2
+        zb = boundingbox[2]+sidelength/2
+        nx = numberofsamples
+        ny = numberofsamples
+        nz = numberofsamples
+        xvalues = []
+        yvalues = []
+        zvalues = []
+        uvalues = []
+        vvalues = []
+        wvalues = []
+        textvalues = []
+        name = document.getElementById("table").rows[c+1].cells[1].innerHTML.slice(document.getElementById("table").rows[c+1].cells[1].innerHTML.indexOf("B\">")+4)
+        runningmin = 10**300
+        runningmax = -1
+        for (i=0;i<N/2;i++) {
+            chargepos.push(document.getElementById("table").rows[c+1].cells[i+2].innerHTML)
+            chargevelo.push(document.getElementById("table").rows[c+1].cells[i+N/2+2].innerHTML)
+        }
+        for (posx=xa;posx<(xb+(xb-xa)/(nx-1)/2);posx+=((xb-xa)/(nx-1))) {
+            for (posy=ya;posy<(yb+(yb-ya)/(ny-1)/2);posy+=((yb-ya)/(ny-1))) {
+                for (posz=za;posz<(zb+(zb-za)/(nz-1)/2);posz+=((zb-za)/(nz-1))) {
+                    xvalues.push(posx)
+                    yvalues.push(posy)
+                    zvalues.push(posz)
+                    utemp = findbfield(posx,posy,posz,chargepos,chargevelo,N/6,1)
+                    vtemp = findbfield(posx,posy,posz,chargepos,chargevelo,N/6,2)
+                    wtemp = findbfield(posx,posy,posz,chargepos,chargevelo,N/6,3)
+                    scalefactor = scaling(utemp,vtemp,wtemp)
+                    uvalues.push(scalefactor*utemp)
+                    vvalues.push(scalefactor*vtemp)
+                    wvalues.push(scalefactor*wtemp)
+                    bstrength = (utemp**2+vtemp**2+wtemp**2)**(1/2)
+                    textvalues.push("\'<br>B<sub>x</sub> = " + utemp + "<br>B<sub>y</sub> = " + vtemp + "<br>B<sub>z</sub> = " + wtemp + "<br>|B| = " + bstrength + "<br>log(B) = " + Math.log10(bstrength) + "<br>at t = " + name + "\'")
+                    runningmin = Math.min(bstrength,runningmin)
+                    runningmax = Math.max(bstrength,runningmax)
+                }
+            }
+        }
+        scaleddiff = (scalingfunction(runningmax)*runningmax-scalingfunction(runningmin)*runningmin)
+        diff = runningmax/runningmin
+        tickvalsvalues = []
+        ticktextvalues = []
+        for (i=0;i<=1;i+=1/8) {
+            tickvalsvalues.push(scalingfunction(runningmin)*runningmin+i*scaleddiff)
+            ticktextvalues.push("\' " + runningmin*diff**i + "<br> (" + Math.log10(runningmin*diff**i) + ")\'")
+        }
+        data = "[{type: 'cone', x:[" + xvalues + "], y:[" + yvalues + "], z:[" + zvalues + "], u:[" + uvalues + "], v:[" + vvalues + "], w:[" + wvalues + "], text:[" + textvalues + "], sizemode:'scaled', sizeref:" + conesize + ", colorscale:" + eval(document.getElementById("settings").elements[4].value) + ", hoverinfo:'x+y+z+text', colorbar:{tickvals:[" + tickvalsvalues + "],ticktext:[" + ticktextvalues + "]}}]"
+        Plotly.newPlot("achart",eval(data),eval(layoutfield))
+    }
+    
+    function run() {
+        if (running==0) {
+        if (fixed==0) {
+            masses = eval(document.getElementById("form").elements[0].value)
+            charges = eval(document.getElementById("form").elements[2].value)
+            considerbfield = document.getElementById("form").elements[13].value
+            N = 6*eval(document.getElementById("form").elements[1].value)
+            d = eval(document.getElementById("form").elements[6].value)
+            s = eval(document.getElementById("form").elements[5].value)
+            y0x = eval(document.getElementById("form").elements[3].value)
+            y0v = eval(document.getElementById("form").elements[4].value)
+            expr = createexpr(masses)
+            y0 = y0x.concat(y0v)
+            h = d/s
+            ystart = []
+            fprevious = []
+            document.getElementById("settings").removeAttribute("hidden")
+            heading = "<tr><th><form>i <input type=\"button\" onclick=\"plote()\" value=\"Plot E\"> <input type=\"button\" onclick=\"plotei()\" value=\"Plot Eᵢ\"> <input type=\"button\" onclick=\"plotkei()\" value=\"Plot KEᵢ\"> <input type=\"button\" onclick=\"plotepei()\" value=\"Plot EPEᵢ\"></form></th>"
+            heading += "<th><form>tᵢ <input type=\"button\" onclick=\"plotall()\" value=\"Plot all\"> <input type=\"button\" onclick=\"plotallxy()\" value=\"Plot all (xᵢ,yᵢ)\"> <input type=\"button\" onclick=\"plotallyz()\" value=\"Plot all (yᵢ,zᵢ)\"> <input type=\"button\" onclick=\"plotallzx()\" value=\"Plot all (zᵢ,xᵢ)\">" 
+            heading += " <input type=\"button\" onclick=\"plotallxyz()\" value=\"Plot (xᵢ,yᵢ,zᵢ)\"> <input type=\"button\" onclick=\"plotallxyzvelocities()\" value=\"Plot (xᵢ′,yᵢ′,zᵢ′)\"> <input type=\"button\" onclick=\"plotallxyzaccelerations()\" value=\"Plot (xᵢ″,yᵢ″,zᵢ″)\"></form></th>"
+            for (i=0;i<=N*3/2-1;i++) {
+                if (i%3==0) {
+                    heading += "<th><form>" + derivative(i+1,0) + " <input type=\"button\" onclick=\"plot(" + i + ")\" value=\"Plot " + derivative(i+1,0) + "\"> <input type=\"button\" onclick=\"plotxy(" + i + ")\" value=\"Plot (" + derivative(i+1,0) +"," + derivative(i+2,0) + ")\"> <input type=\"button\" onclick=\"plotxyz(" + i + ")\" value=\"Plot (" + derivative(i+1,0) + "," + derivative(i+2,0) + "," + derivative(i+3,0) + ")\"></form></th>"
+                }
+                if (i%3==1) {
+                    heading += "<th><form>" + derivative(i+1,0) + " <input type=\"button\" onclick=\"plot(" + i + ")\" value=\"Plot " + derivative(i+1,0) + "\"> <input type=\"button\" onclick=\"plotyz(" + i + ")\" value=\"Plot (" + derivative(i+1,0) +"," + derivative(i+2,0) + ")\"></form></th>"
+                }
+                if (i%3==2) {
+                    heading += "<th><form>" + derivative(i+1,0) + " <input type=\"button\" onclick=\"plot(" + i + ")\" value=\"Plot " + derivative(i+1,0) + "\"> <input type=\"button\" onclick=\"plotzx(" + i + ")\" value=\"Plot (" + derivative(i+1,0) +"," + derivative(i-1,0) + ")\"></form></th>"
+                }
+            }
+            extensionstring = ""
+            if (expr.length>2500) {
+                extensionstring = "...... (" + expr.length + " characters)"
+            }
+            document.getElementById("table").innerHTML = heading + "</tr>"
+            document.getElementById("info").innerHTML = "Masses [m₁,m₂,...,mₙ] = " + masses + " with n = " + N/6 + "<br>Charges [q₁,q₂,...,qₙ] = " + charges + " with n = " + N/6 + "<br>Initial positions [x₁(0),y₁(0),z₁(0),...,xₙ(0),yₙ(0),zₙ(0)] = " + y0x + " with n = " + N/6 + "<br>Initial velocities [x₁′(0),y₁′(0),z₁′(0),...,xₙ′(0),yₙ′(0),zₙ′(0)] = " + y0v + " with n = " + N/6 + "<br>"
+            document.getElementById("info").innerHTML += "[dx₁/dt,dy₁/dt,dz₁/dt,...,dxₙ/dt,dyₙ/dt,dzₙ/dt] = " + expr.slice(0,2500) + extensionstring + " with n = " + N/3 + "<br>Initial values [x₁(0),y₁(0),z₁(0),...,xₙ(0),yₙ(0),zₙ(0)] = " + y0 + " with n = " + N/3 + "<br>Number of steps within one tᵢ = " + s + "<br>Distance between successive tᵢ = " + d
+        }
+        fixed = 1
+        stepsonce = eval(document.getElementById("form").elements[7].value)
+        theinterval = setInterval(runonce,eval(document.getElementById("form").elements[8].value)*1000)
+        running = 1
+        }
+    }
+    
+    function stop() {
+        if (running==1) {
+            clearInterval(theinterval)
+            document.getElementById("stats").innerHTML = document.getElementById("stats").innerHTML.replace("Running","Stopped")
+        }
+        running = 0
+    }
+    
+    function clean() {
+        if (running==0) {
+            fixed = 0
+            iterations = 0
+            ystart = []
+            document.getElementById("table").innerHTML = ""
+            document.getElementById("info").innerHTML = ""
+            document.getElementById("stats").innerHTML = ""
+            document.getElementById("settings").setAttribute("hidden","hidden")
+            Plotly.purge("achart")
+        }
+    }
+    
+    function runonce() {
+        document.getElementById("stats").innerHTML = "Running   i = " + iterations + " and t = " + iterations*(d/s)
+        for (i=iterations;i<iterations+stepsonce;i++) {
+            if (i%s==0) {
+                row = "<tr><td>" + i + "</td><td><input type=\"button\" style=\"font-size: 12px;margin: 0px 0px;font-weight: bold;\" onclick=\"plotefield(" + i/s + ")\" value=\"E\"> <input type=\"button\" style=\"font-size: 12px;margin: 0px 0px;font-weight: bold;\" onclick=\"plotbfield(" + i/s + ")\" value=\"B\"> " + i*h + "</td>"
+                for (j=0;j<N;j++) {
+                    row += "<td>" + y0[j] + "</td>"
+                }
+                for (j=0;j<N/2;j++) {
+                    row += "<td>" + g(i*h,y0)[N/2+j] + "</td>"
+                }
+                document.getElementById("table").innerHTML += row + "</tr>"
+            }
+            if (i<7) {
+                ystart.push(y0)
+                y0 = classicfourthorderrungekuttamethod(h,i*h,y0)
+            }
+            if (i==7) {
+                ystart.push(y0)
+                fprevious = [g(7*h,ystart[7]),g(6*h,ystart[6]),g(5*h,ystart[5]),g(4*h,ystart[4]),g(3*h,ystart[3]),g(2*h,ystart[2]),g(h,ystart[1]),g(0,ystart[0])]
+                y0 = eighthorderadamsbashforthmethod(h,i*h,y0)
+            }
+            if (i>7) {
+                fprevious = [g(i*h,y0),fprevious[0],fprevious[1],fprevious[2],fprevious[3],fprevious[4],fprevious[5],fprevious[6]]
+                y0 = eighthorderadamsbashforthmethod(h,i*h,y0)
+            }
+        }
+        iterations += stepsonce
+    }
+    
+</script>
+</body>
+</html>
