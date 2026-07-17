@@ -1604,30 +1604,16 @@ input, select, textarea {
 	}
 
 		#main .thumb {
-    -moz-transition:
-        opacity 1.25s ease-in-out,
-        -moz-transform 0.25s ease,
-        box-shadow 0.25s ease;
-    -webkit-transition:
-        opacity 1.25s ease-in-out,
-        -webkit-transform 0.25s ease,
-        box-shadow 0.25s ease;
-    -ms-transition:
-        opacity 1.25s ease-in-out,
-        -ms-transform 0.25s ease,
-        box-shadow 0.25s ease;
-    transition:
-        opacity 1.25s ease-in-out,
-        transform 0.25s ease,
-        box-shadow 0.25s ease;
-
-    pointer-events: auto;
-    -webkit-tap-highlight-color: rgba(255, 255, 255, 0);
-    opacity: 1;
-    overflow: hidden;
-    position: relative;
-    cursor: pointer;
-}
+			-moz-transition: opacity 1.25s ease-in-out;
+			-webkit-transition: opacity 1.25s ease-in-out;
+			-ms-transition: opacity 1.25s ease-in-out;
+			transition: opacity 1.25s ease-in-out;
+			pointer-events: auto;
+			-webkit-tap-highlight-color: rgba(255, 255, 255, 0);
+			opacity: 1;
+			overflow: hidden;
+			position: relative;
+		}
 
 			#main .thumb:after {
 				background-image: -moz-linear-gradient(to top, rgba(10,17,25,0.35) 5%, rgba(10,17,25,0) 35%);
@@ -1644,16 +1630,6 @@ input, select, textarea {
 				top: 0;
 				width: 100%;
 			}
-
-#main .thumb:hover {
-    -moz-transform: translateY(-8px);
-    -webkit-transform: translateY(-8px);
-    -ms-transform: translateY(-8px);
-    transform: translateY(-8px);
-
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.35);
-    z-index: 10;
-}
 
 			#main .thumb > .image {
 				-webkit-tap-highlight-color: rgba(255, 255, 255, 0);
