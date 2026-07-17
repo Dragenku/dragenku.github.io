@@ -1,0 +1,524 @@
+<html>
+<body>
+    
+<style>
+    body {
+        padding: 1%;
+    }
+    .font {
+        font-size: 16px;
+        font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif
+    }
+    input[type=button] {
+        font-size: 16px;
+        font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+        margin: 2px 0px;
+    }
+    input[type=text] {
+        font-size: 16px;
+        font-family: Garamond, serif;
+        padding: 2px 4px;
+        margin: 4px;
+    }
+    .width100 {
+        width: 100px;
+    }
+    .width200 {
+        width: 200px;
+    }
+    .width400 {
+        width: 400px;
+    }
+    table,td {
+        padding-left: 8px;
+        padding-right: 8px;
+        padding-top: 4px;
+        padding-bottom: 4px;
+        text-align: left;
+        border: 1px solid black;
+        border-collapse: collapse;
+    }
+    td {
+        white-space: nowrap;
+    }
+    th {
+        padding-left: 8px;
+        padding-right: 8px;
+        padding-top: 4px;
+        text-align: left;
+        border: 1px solid black;
+        border-collapse: collapse;
+        vertical-align: top;
+    }
+    .info {
+        font-size: 16px;
+        font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+        line-height: 1.5;
+    }
+</style>
+
+<form id="form" class="font">Masses [m₁,m₂,...,mₙ] = <input type="text" class="width400" value="[1,2,3,4,100]"> with n = <input type="text" class="width100" value="5"><br>
+Initial positions [x₁(0),y₁(0),...,xₙ(0),yₙ(0)] = <input type="text" class="width400" value="[2,0,0,-3,-5,0,0,8,0,0]"><br>
+Initial velocities [x₁'(0),y₁'(0),...,xₙ'(0),yₙ'(0)] = <input type="text" class="width400" value="[0,-0.0000578,-0.0000472,0,0,0.0000365,0.0000289,0,0,0]"><br>
+Number of steps within one tᵢ = <input type="text" class="width100" value="60000"><br>
+Distance between successive tᵢ = <input type="text" class="width200" value="10000"><br>
+Calculation rate = <input type="text" class="width100" value="10000"> steps per <input type="text" class="width100" value="0.1"> seconds<br><br>
+<input type="button" onclick="run()" value="Run" style="font-weight: bold;"> <input type="button" onclick="stop()" value="Stop" style="font-weight: bold;"> <input type="button" onclick="clean()" value="Clear" style="font-weight: bold;"> <input id="tablebutton" type="button" onclick="tabletoggle()" value="Hide table" style="font-weight: bold;"></form>
+
+<hr color=black size=1px><p id="info" class="info"></p>
+
+<p id="stats" class="font"></p>
+
+<div id="achart" style="width:100%;height:800px"></div><br>
+
+<table id="table" class="font"></table>
+
+<p id="debug" class="font"></p>
+
+<script src='https://cdn.plot.ly/plotly-2.24.1.min.js'></script>
+    
+<script>
+    
+    G = "6.6743*10**(-11)"
+    d = 0.1
+    n = 20
+    s = 1000
+    y0 = [2,0]
+    h = 0.0001
+    N = 2
+    expr = "y"
+    fprevious = []
+    ystart = []
+    running = 0
+    fixed = 0
+    iterations = 0
+    stepsonce = 1000
+    masses = []
+    superscripts = ["¹","²","³","⁴","⁵","⁶","⁷","⁸","⁹","¹⁰","¹¹","¹²","¹³","¹⁴","¹⁵","¹⁶","¹⁷","¹⁸","¹⁹","²⁰","²¹","²²","²³","²⁴","²⁵","²⁶","²⁷","²⁸","²⁹","³⁰","³¹","³²","³³","³⁴","³⁵","³⁶","³⁷","³⁸","³⁹","⁴⁰","⁴¹","⁴²","⁴³","⁴⁴","⁴⁵","⁴⁶","⁴⁷","⁴⁸","⁴⁹","⁵⁰","⁵¹","⁵²","⁵³","⁵⁴","⁵⁵","⁵⁶","⁵⁷","⁵⁸","⁵⁹","⁶⁰","⁶¹","⁶²","⁶³","⁶⁴","⁶⁵","⁶⁶","⁶⁷","⁶⁸","⁶⁹","⁷⁰","⁷¹","⁷²","⁷³","⁷⁴","⁷⁵","⁷⁶","⁷⁷","⁷⁸","⁷⁹","⁸⁰","⁸¹","⁸²","⁸³","⁸⁴","⁸⁵","⁸⁶","⁸⁷","⁸⁸","⁸⁹","⁹⁰","⁹¹","⁹²","⁹³","⁹⁴","⁹⁵","⁹⁶","⁹⁷","⁹⁸","⁹⁹"]
+    subscripts = ["₁","₂","₃","₄","₅","₆","₇","₈","₉","₁₀","₁₁","₁₂","₁₃","₁₄","₁₅","₁₆","₁₇","₁₈","₁₉","₂₀","₂₁","₂₂","₂₃","₂₄","₂₅","₂₆","₂₇","₂₈","₂₉","₃₀","₃₁","₃₂","₃₃","₃₄","₃₅","₃₆","₃₇","₃₈","₃₉","₄₀","₄₁","₄₂","₄₃","₄₄","₄₅","₄₆","₄₇","₄₈","₄₉","₅₀","₅₁","₅₂","₅₃","₅₄","₅₅","₅₆","₅₇","₅₈","₅₉","₆₀","₆₁","₆₂","₆₃","₆₄","₆₅","₆₆","₆₇","₆₈","₆₉","₇₀","₇₁","₇₂","₇₃","₇₄","₇₅","₇₆","₇₇","₇₈","₇₉","₈₀","₈₁","₈₂","₈₃","₈₄","₈₅","₈₆","₈₇","₈₈","₈₉","₉₀","₉₁","₉₂","₉₃","₉₄","₉₅","₉₆","₉₇","₉₈","₉₉"]
+    colours = ['0,158,242,1','255,77,125,1','0,196,195,1','255,157,0,1','167,70,255,1','58,134,255,1','131,56,236,1','255,0,110,1','251,86,7,1','255,190,11,1','38,70,83,1','42,157,143,1','233,196,106,1','244,162,97,1','231,111,81,1','0,245,212,1','0,187,249,1','254,228,64,1','241,91,181,1','155,93,229,1','228,193,249,1','169,222,249,1','208,244,222,1','252,246,189,1','255,153,200,1','7,59,76,1','17,138,178,1','6,214,160,1','255,209,102,1','239,71,111,1','0,129,167,1','0,175,185,1','253,252,220,1','254,217,183,1','240,113,103,1','112,214,255,1','255,112,166,1','255,151,112,1','255,214,112,1','233,255,112,1','128,155,206,1','149,184,209,1','184,224,210,1','214,234,223,1','234,196,213,1','51,92,103,1','255,243,176,1','224,159,62,1','158,42,43,1','84,11,14,1','114,63,184,1','47,132,4,1','198,37,153,1','230,12,62,1','183,231,193,1','164,136,175,1','59,178,185,1','2,21,140,1','67,85,139,1','3,162,240,1','219,21,20,1','195,109,60,1','148,55,50,1','41,48,195,1','186,54,177,1','232,161,238,1','89,228,166,1','21,243,234,1','111,182,185,1','0,158,50,1','238,144,54,1','14,152,170,1','118,218,121,1','143,85,178,1','153,199,166,1','88,199,85,1','44,228,193,1','160,155,250,1','181,32,44,1','98,198,227,1','210,14,184,1','77,86,25,1','88,229,200,1','177,40,53,1','126,211,22,1','46,159,214,1','8,194,174,1','101,142,13,1','160,114,238,1','205,40,186,1','121,217,34,1','52,184,149,1','3,105,43,1','186,9,161,1','158,69,255,1','258,215,244,1','31,32,109,1','174,218,160,1','200,249,164,1','65,180,150,1']
+    layoutt0 = {xaxis:{title:'t',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},exponentformat:'power',showexponent:'all'},yaxis:{tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},exponentformat:'power',showexponent:'all'},legend:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:14}}}
+    layoutxy = {xaxis:{title:'x',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},exponentformat:'power',showexponent:'all'},
+    yaxis:{title:'y',titlefont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18},tickfont:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:16},exponentformat:'power',showexponent:'all'},legend:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'LucidaSansUnicode,LucidaGrande,sans-serif',size:14}}}
+    
+    function g(t,y) {
+        return eval(expr)
+    }
+    
+    function u(xyz,ith) {
+        return (ith-1)*2+xyz-1
+    }
+    
+    function tabletoggle() {
+        hidden = document.getElementById("table").getAttribute("hidden")
+        if (hidden) {
+            document.getElementById("table").removeAttribute("hidden")
+            document.getElementById("tablebutton").value = "Hide table"
+        } else {
+            document.getElementById("table").setAttribute("hidden","hidden")
+            document.getElementById("tablebutton").value = "Show table"
+        }
+    }
+    
+    function classicfourthorderrungekuttamethod(h,ti,yi) {
+        k1 = g(ti,yi)
+        hk1 = k1.map(x => (h/2)*x);
+        yi1 = yi.map(function (num, idx) {return num + hk1[idx];});
+        k2 = g(ti+h/2,yi1)
+        hk2 = k2.map(x => (h/2)*x);
+        yi2 = yi.map(function (num, idx) {return num + hk2[idx];});
+        k3 = g(ti+h/2,yi2)
+        hk3 = k3.map(x => h*x);
+        yi3 = yi.map(function (num, idx) {return num + hk3[idx];});
+        k4 = g(ti+h,yi3)
+        k2m = k2.map(x => 2*x);
+        k3m = k3.map(x => 2*x);
+        kt = k1.map(function (num, idx) {return num + k2m[idx] + k3m[idx] + k4[idx];});
+        kth = kt.map(x => (h/6)*x);
+        ans = yi.map(function (num, idx) {return num + kth[idx];});
+        return ans
+    }
+    
+    function eighthorderadamsbashforthmethod(h,ti,yi) {
+        f0m = fprevious[0].map(x => (16083/4480)*x);
+        f1m = fprevious[1].map(x => (-1152169/120960)*x);
+        f2m = fprevious[2].map(x => (242653/13440)*x);
+        f3m = fprevious[3].map(x => (-296053/13440)*x);
+        f4m = fprevious[4].map(x => (2102243/120960)*x);
+        f5m = fprevious[5].map(x => (-115747/13440)*x);
+        f6m = fprevious[6].map(x => (32863/13440)*x);
+        f7m = fprevious[7].map(x => (-5257/17280)*x);
+        fm = f0m.map(function (num, idx) {return num + f1m[idx] + f2m[idx] + f3m[idx] + f4m[idx] + f5m[idx] + f6m[idx] + f7m[idx];});
+        fmh = fm.map(x => h*x);
+        ans = yi.map(function (num, idx) {return num + fmh[idx];});
+        return ans
+    }
+    
+    function plot(c) {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        yvalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[1].innerHTML)
+            yvalues.push(document.getElementById("table").rows[i].cells[c+2].innerHTML)
+        }
+        data = [{
+            x: xvalues,
+            y: yvalues,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: derivative(c+1,0),
+            marker: {
+                color: 'rgba(' + colours[c] + ')'
+            },
+            line: {
+                color: 'rgba(' + colours[c] + ')',
+                shape: 'spline',
+                smoothness: 0.5
+            }
+        },{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}]
+        Plotly.newPlot("achart",data,eval(layoutt0))
+    }
+    
+    function plote() {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        evalues = []
+        kevalues = []
+        gpevalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[1].innerHTML)
+            ke = 0
+            for (j=0;j<=N/4-1;j++) {
+                ke += (1/2)*masses[j]*(eval(document.getElementById("table").rows[i].cells[N/2+2*j+2].innerHTML)**2+eval(document.getElementById("table").rows[i].cells[N/2+2*j+3].innerHTML)**2)
+            }
+            kevalues.push(ke)
+            gpe = 0
+            for (j=0;j<=N/4-1;j++) {
+                for (k=j+1;k<=N/4-1;k++) {
+                    gpe -= eval(G)*masses[j]*masses[k]/((eval(document.getElementById("table").rows[i].cells[2*j+2].innerHTML)-eval(document.getElementById("table").rows[i].cells[2*k+2].innerHTML))**2+(eval(document.getElementById("table").rows[i].cells[2*j+3].innerHTML)-eval(document.getElementById("table").rows[i].cells[2*k+3].innerHTML))**2)**(1/2)
+                }
+            }
+            gpevalues.push(gpe)
+            evalues.push(ke+gpe)
+        }
+        data = [{x: xvalues,y: evalues,type: 'scatter',mode: 'lines+markers',name: 'E',marker: {color: 'rgba(' + colours[0] + ')'},line: {color: 'rgba(' + colours[0] + ')',shape: 'spline',smoothness: 0.5}},
+        {x: xvalues,y: kevalues,type: 'scatter',mode: 'lines+markers',name: 'KE',marker: {color: 'rgba(' + colours[1] + ')'},line: {color: 'rgba(' + colours[1] + ')',shape: 'spline',smoothness: 0.5}},
+        {x: xvalues,y: gpevalues,type: 'scatter',mode: 'lines+markers',name: 'GPEₛ',marker: {color: 'rgba(' + colours[2] + ')'},line: {color: 'rgba(' + colours[2] + ')',shape: 'spline',smoothness: 0.5}},
+        {x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}]
+        Plotly.newPlot("achart",data,eval(layoutt0))
+    }
+    
+    function plotei() {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[1].innerHTML)
+        }
+        data = []
+        for (c=0;c<N/4;c++) {
+            yvalues = []
+            for (j=1;j<=points;j++) {
+                gpe = 0
+                for (k=0;k<=N/4-1;k++) {
+                    if (c!=k) {
+                        gpe -= eval(G)*masses[c]*masses[k]/((eval(document.getElementById("table").rows[j].cells[2*c+2].innerHTML)-eval(document.getElementById("table").rows[j].cells[2*k+2].innerHTML))**2+(eval(document.getElementById("table").rows[j].cells[2*c+3].innerHTML)-eval(document.getElementById("table").rows[j].cells[2*k+3].innerHTML))**2)**(1/2)
+                    }
+                }
+                ke = (1/2)*masses[c]*(eval(document.getElementById("table").rows[j].cells[N/2+2*c+2].innerHTML)**2+eval(document.getElementById("table").rows[j].cells[N/2+2*c+3].innerHTML)**2)
+                yvalues.push(ke+gpe)
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],type: 'scatter',mode: 'lines+markers',name: 'E" + subscripts[c] + "',marker: {color: 'rgba(" + colours[c] + ")'},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        data.push("{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}")
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutt0))
+    }
+    
+    function plotkei() {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[1].innerHTML)
+        }
+        data = []
+        for (c=0;c<N/4;c++) {
+            yvalues = []
+            for (j=1;j<=points;j++) {
+                yvalues.push((1/2)*masses[c]*(eval(document.getElementById("table").rows[j].cells[N/2+2*c+2].innerHTML)**2+eval(document.getElementById("table").rows[j].cells[N/2+2*c+3].innerHTML)**2))
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],type: 'scatter',mode: 'lines+markers',name: 'KE" + subscripts[c] + "',marker: {color: 'rgba(" + colours[c] + ")'},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        data.push("{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}")
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutt0))
+    }
+    
+    function plotgpei() {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[1].innerHTML)
+        }
+        data = []
+        for (c=0;c<N/4;c++) {
+            yvalues = []
+            for (j=1;j<=points;j++) {
+                gpe = 0
+                for (k=0;k<=N/4-1;k++) {
+                    if (c!=k) {
+                        gpe -= eval(G)*masses[c]*masses[k]/((eval(document.getElementById("table").rows[j].cells[2*c+2].innerHTML)-eval(document.getElementById("table").rows[j].cells[2*k+2].innerHTML))**2+(eval(document.getElementById("table").rows[j].cells[2*c+3].innerHTML)-eval(document.getElementById("table").rows[j].cells[2*k+3].innerHTML))**2)**(1/2)
+                    }
+                }
+                yvalues.push(gpe)
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],type: 'scatter',mode: 'lines+markers',name: 'GPE" + subscripts[c] + "',marker: {color: 'rgba(" + colours[c] + ")'},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        data.push("{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}")
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutt0))
+    }
+    
+    function plotxy(c) {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        yvalues = []
+        tvalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[c+2].innerHTML)
+            yvalues.push(document.getElementById("table").rows[i].cells[c+3].innerHTML)
+            tvalues.push("at t = " + document.getElementById("table").rows[i].cells[1].innerHTML)
+        }
+        data = [{
+            x: xvalues,
+            y: yvalues,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: '(' + derivative(c+1,0) + ',' + derivative(c+2,0) + ')',
+            text: tvalues,
+            marker: {
+                color: 'rgba(' + colours[c/2] + ')'
+            },
+            line: {
+                color: 'rgba(' + colours[c/2] + ')',
+                shape: 'spline',
+                smoothness: 0.5
+            }
+        },{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}]
+        Plotly.newPlot("achart",data,eval(layoutxy))
+    }
+    
+    function plotall() {
+        points = document.getElementById("table").rows.length - 1
+        xvalues = []
+        for (i=1;i<=points;i++) {
+            xvalues.push(document.getElementById("table").rows[i].cells[1].innerHTML)
+        }
+        data = []
+        for (c=0;c<=N*3/2-1;c++) {
+            yvalues = []
+            for (j=1;j<=points;j++) {
+                yvalues.push(document.getElementById("table").rows[j].cells[c+2].innerHTML)
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],type: 'scatter',mode: 'lines+markers',name: '" + derivative(c+1,0) + "',marker: {color: 'rgba(" + colours[c] + ")'},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        data.push("{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}")
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutt0))
+    }
+    
+    function plotpositions() {
+        points = document.getElementById("table").rows.length - 1
+        data = []
+        tvalues = []
+        for (i=1;i<=points;i++) {
+            tvalues.push("\'at t = " + document.getElementById("table").rows[i].cells[1].innerHTML + "\'")
+        }
+        for (c=0;c<=N/4-1;c++) {
+            xvalues = []
+            yvalues = []
+            for (j=1;j<=points;j++) {
+                xvalues.push(document.getElementById("table").rows[j].cells[2*c+2].innerHTML)
+                yvalues.push(document.getElementById("table").rows[j].cells[2*c+3].innerHTML)
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],text: [" + tvalues + "],type: 'scatter',mode: 'lines+markers',name: '(" + derivative(2*c+1,0) + "," + derivative(2*c+2,0) + ")',marker: {color: 'rgba(" + colours[c] + ")'},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        data.push("{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}")
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutxy))
+    }
+    
+    function plotvelocities() {
+        points = document.getElementById("table").rows.length - 1
+        data = []
+        tvalues = []
+        for (i=1;i<=points;i++) {
+            tvalues.push("\'at t = " + document.getElementById("table").rows[i].cells[1].innerHTML + "\'")
+        }
+        for (c=N/4;c<=N/2-1;c++) {
+            xvalues = []
+            yvalues = []
+            for (j=1;j<=points;j++) {
+                xvalues.push(document.getElementById("table").rows[j].cells[2*c+2].innerHTML)
+                yvalues.push(document.getElementById("table").rows[j].cells[2*c+3].innerHTML)
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],text: [" + tvalues + "],type: 'scatter',mode: 'lines+markers',name: '(" + derivative(2*c+1,0) + "," + derivative(2*c+2,0) + ")',marker: {color: 'rgba(" + colours[c] + ")'},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        data.push("{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}")
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutxy))
+    }
+    
+    function plotaccelerations() {
+        points = document.getElementById("table").rows.length - 1
+        data = []
+        tvalues = []
+        for (i=1;i<=points;i++) {
+            tvalues.push("\'at t = " + document.getElementById("table").rows[i].cells[1].innerHTML + "\'")
+        }
+        for (c=N/2;c<=N*3/4-1;c++) {
+            xvalues = []
+            yvalues = []
+            for (j=1;j<=points;j++) {
+                xvalues.push(document.getElementById("table").rows[j].cells[2*c+2].innerHTML)
+                yvalues.push(document.getElementById("table").rows[j].cells[2*c+3].innerHTML)
+            }
+            data.push("{x: [" + xvalues + "],y: [" + yvalues + "],text: [" + tvalues + "],type: 'scatter',mode: 'lines+markers',name: '(" + derivative(2*c+1,0) + "," + derivative(2*c+2,0) + ")',marker: {color: 'rgba(" + colours[c] + ")'},line: {color: 'rgba(" + 
+            colours[c] + ")',shape: 'spline',smoothness: 0.5}}")
+        }
+        data.push("{x:[],y:[],z:[],ncontours:0,showscale:false,type:'contour'}")
+        Plotly.newPlot("achart",eval("[" + data + "]"),eval(layoutxy))
+    }
+    
+    function derivative(i,nth) {
+        j = (i-1)%(N/2)
+        if (j%2==0) {
+            str = "x" + subscripts[j/2]
+        }
+        if (j%2==1) {
+            str = "y" + subscripts[(j-1)/2]
+        }
+        if (i<=N/2) {
+            return str
+        } else if (i<=N) {
+            return str + "′"
+        } else {
+            return str + "″"
+        }
+    }
+    
+    function createexpr(mass) {
+        string = "["
+        for (i=1;i<=N/4;i++) {
+            string += "y[u(1," + (N/4+i) + ")],y[u(2," + (N/4+i) + ")],"
+        }
+        for (i=1;i<=N/4;i++) {
+            string += G + "*("
+            for (j=1;j<=N/4;j++) {
+                if (i!=j) {
+                    string += mass[j-1] + "*(y[u(1," + j + ")]-y[u(1," + i + ")])/((y[u(1," + j + ")]-y[u(1," + i + ")])**2+(y[u(2," + j + ")]-y[u(2," + i + ")])**2)**(3/2)+"
+                }
+            }
+            string = string.slice(0,-1)
+            string += ")," + G + "*("
+            for (j=1;j<=N/4;j++) {
+                if (i!=j) {
+                    string += mass[j-1] + "*(y[u(2," + j + ")]-y[u(2," + i + ")])/((y[u(1," + j + ")]-y[u(1," + i + ")])**2+(y[u(2," + j + ")]-y[u(2," + i + ")])**2)**(3/2)+"
+                }
+            }
+            string = string.slice(0,-1)
+            string += "),"
+        }
+        string = string.slice(0,-1)
+        string += "]"
+        return string
+    }
+    
+    function run() {
+        if (running==0) {
+        if (fixed==0) {
+            masses = eval(document.getElementById("form").elements[0].value)
+            N = 4*eval(document.getElementById("form").elements[1].value)
+            d = eval(document.getElementById("form").elements[5].value)
+            s = eval(document.getElementById("form").elements[4].value)
+            y0x = eval(document.getElementById("form").elements[2].value)
+            y0v = eval(document.getElementById("form").elements[3].value)
+            expr = createexpr(masses)
+            y0 = y0x.concat(y0v)
+            h = d/s
+            ystart = []
+            fprevious = []
+            heading = "<tr><th><form>i <input type=\"button\" onclick=\"plote()\" value=\"Plot E\"> <input type=\"button\" onclick=\"plotei()\" value=\"Plot Eᵢ\"> <input type=\"button\" onclick=\"plotkei()\" value=\"Plot KEᵢ\"> <input type=\"button\" onclick=\"plotgpei()\" value=\"Plot GPEᵢ\"></form></th>"
+            heading += "<th><form>tᵢ <input type=\"button\" onclick=\"plotall()\" value=\"Plot all\"> <input type=\"button\" onclick=\"plotpositions()\" value=\"Plot (xᵢ,yᵢ)\"> <input type=\"button\" onclick=\"plotvelocities()\" value=\"Plot (xᵢ′,yᵢ′)\"> <input type=\"button\" onclick=\"plotaccelerations()\" value=\"Plot (xᵢ″,yᵢ″)\"></form></th>"
+            for (i=0;i<=N*3/2-1;i++) {
+                if (i%2==0) {
+                    heading += "<th><form>" + derivative(i+1,0) + " <input type=\"button\" onclick=\"plot(" + i + ")\" value=\"Plot " + derivative(i+1,0) + "\"> <input type=\"button\" onclick=\"plotxy(" + i + ")\" value=\"Plot (" + derivative(i+1,0) +"," + derivative(i+2,0) + ")\"></form></th>"
+                }
+                if (i%2==1) {
+                    heading += "<th><form>" + derivative(i+1,0) + " <input type=\"button\" onclick=\"plot(" + i + ")\" value=\"Plot " + derivative(i+1,0) + "\"></form></th>"
+                }
+            }
+            document.getElementById("table").innerHTML = heading + "</tr>"
+            document.getElementById("info").innerHTML = "Masses [m₁,m₂,...,mₙ] = " + masses + " with n = " + N/4 + "<br>Initial positions [x₁(0),y₁(0),...,xₙ(0),yₙ(0)] = " + y0x + " with n = " + N/4 + "<br>Initial velocities [x₁'(0),y₁'(0),...,xₙ'(0),yₙ'(0)] = " + y0v + " with n = " + N/4 + "<br>"
+            document.getElementById("info").innerHTML += "[dx₁/dt,dy₁/dt,dx₂/dt,dy₂/dt,...,dxₙ/dt,dyₙ/dt] = " + expr + " with n = " + N/2 + "<br>Initial values [x₁(0),y₁(0),x₂(0),y₂(0),...,xₙ(0),yₙ(0)] = " + y0 + " with n = " + N/2 + "<br>Number of steps within one tᵢ = " + s + "<br>Distance between successive tᵢ = " + d
+        }
+        fixed = 1
+        stepsonce = eval(document.getElementById("form").elements[6].value)
+        theinterval = setInterval(runonce,eval(document.getElementById("form").elements[7].value)*1000)
+        running = 1
+        }
+    }
+    
+    function stop() {
+        if (running==1) {
+            clearInterval(theinterval)
+            document.getElementById("stats").innerHTML = document.getElementById("stats").innerHTML.replace("Running","Stopped")
+        }
+        running = 0
+    }
+    
+    function clean() {
+        if (running==0) {
+            fixed = 0
+            iterations = 0
+            ystart = []
+            document.getElementById("table").innerHTML = ""
+            document.getElementById("info").innerHTML = ""
+            document.getElementById("stats").innerHTML = ""
+            Plotly.purge("achart")
+        }
+    }
+    
+    function runonce() {
+        document.getElementById("stats").innerHTML = "Running   i = " + iterations + " and t = " + iterations*(d/s)
+        for (i=iterations;i<iterations+stepsonce;i++) {
+            if (i%s==0) {
+                row = "<tr><td>" + i + "</td><td>" + i*h + "</td>"
+                for (j=0;j<N;j++) {
+                    row += "<td>" + y0[j] + "</td>"
+                }
+                for (j=0;j<N/2;j++) {
+                    row += "<td>" + g(i*h,y0)[N/2+j] + "</td>"
+                }
+                document.getElementById("table").innerHTML += row + "</tr>"
+            }
+            if (i<7) {
+                ystart.push(y0)
+                y0 = classicfourthorderrungekuttamethod(h,i*h,y0)
+            }
+            if (i==7) {
+                ystart.push(y0)
+                fprevious = [g(7*h,ystart[7]),g(6*h,ystart[6]),g(5*h,ystart[5]),g(4*h,ystart[4]),g(3*h,ystart[3]),g(2*h,ystart[2]),g(h,ystart[1]),g(0,ystart[0])]
+                y0 = eighthorderadamsbashforthmethod(h,i*h,y0)
+            }
+            if (i>7) {
+                fprevious = [g(i*h,y0),fprevious[0],fprevious[1],fprevious[2],fprevious[3],fprevious[4],fprevious[5],fprevious[6]]
+                y0 = eighthorderadamsbashforthmethod(h,i*h,y0)
+            }
+        }
+        iterations += stepsonce
+    }
+    
+</script>
+</body>
+</html>
