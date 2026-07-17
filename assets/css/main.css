@@ -1646,10 +1646,10 @@ input, select, textarea {
 
 			/*The five lines below are not from the original template*/
 			#main .thumb:hover > .image {
-				-moz-transform: scale(1.02);
-				-webkit-transform: scale(1.02);
-				-ms-transform: scale(1.02);
-				transform: scale(1.02);
+				-moz-transform: scale(1.05);
+				-webkit-transform: scale(1.05);
+				-ms-transform: scale(1.05);
+				transform: scale(1.05);
 			}
 
 			#main .thumb > h2 {
