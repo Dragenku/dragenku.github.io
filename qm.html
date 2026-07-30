@@ -1,0 +1,591 @@
+<html>
+<body>
+    
+<style>
+    body {
+        padding: 1%;
+    }
+    .font {
+        font-size: 16px;
+        font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif
+    }
+    input[type=button] {
+        font-size: 16px;
+        font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+        margin: 2px 0px;
+    }
+    input[type=text] {
+        font-size: 16px;
+        font-family: Garamond, serif;
+        padding: 2px 4px;
+        margin: 4px;
+    }
+    .width100 {
+        width: 67px;
+    }
+    .width200 {
+        width: 200px;
+    }
+    .width400 {
+        width: 400px;
+    }
+    table,td {
+        padding-left: 8px;
+        padding-right: 8px;
+        padding-top: 4px;
+        padding-bottom: 4px;
+        text-align: left;
+        border: 1px solid black;
+        border-collapse: collapse;
+        white-space: nowrap;
+    }
+    th {
+        padding-left: 8px;
+        padding-right: 8px;
+        padding-top: 4px;
+        text-align: left;
+        border: 1px solid black;
+        border-collapse: collapse;
+        vertical-align: top;
+    }
+    .info {
+        font-size: 16px;
+        font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+        line-height: 1.5;
+    }
+</style>
+
+<div style="display:flex; width: 100%"><p id="equationV" class="font" style="width: 50%"></p><p id="equationpsi" class="font" style="width: 50%"></p></div>
+
+<form id="form" class="font">Potential V(x) = <input type="text" class="width400" value="25*step(x,-0.5,0.5)" oninput="updateequation()"> with initial wavefunction ψ(x,0) = <input type="text" class="width400" value="gauss(x,-5,0.2,10)" oninput="updateequation()"><br>
+Particle mass m = <input type="text" class="width100" value="1"> | Simulation interval is from x<sub>min</sub> = <input type="text" class="width100" value="-10"> to x<sub>max</sub> = <input type="text" class="width100" value="10"> with N = <input type="text" class="width100" value="2001"> grid points<br> 
+Steps within one t<sub>i</sub> = <input type="text" class="width100" value="500"> with distance between t<sub>i</sub> = <input type="text" class="width100" value="0.01"> | Calculation rate = <input type="text" class="width100" value="500"> steps per <input type="text" class="width100" value="0.05"> seconds<br><br>
+<input type="button" onclick="run()" value="Run" style="font-weight: bold;"> <input type="button" onclick="stop()" value="Stop" style="font-weight: bold;"> <input type="button" onclick="clean()" value="Clear" style="font-weight: bold;"></form>
+
+<hr color=black size=1px><p id="info" class="info"></p>
+
+<p id="stats" class="font"></p>
+
+<div id="achart" style="width:100%;height:800px"></div><br>
+
+<form id="settings" class="font">Tabulate from i<sub>0</sub> = <input type="text" class="width100" value="0"> to i<sub>1</sub> = <input type="text" class="width100" value="19"> <input type="button" onclick="lleft()" value="≪" style="font-weight: bold; font-size: 14px;"> <input type="button" onclick="left()" value="<" style="font-weight: bold; font-size: 14px;"> <input type="button" onclick="set()" value="Set" style="font-weight: bold;"> <input type="button" onclick="right()" value=">" style="font-weight: bold; font-size: 14px;"> <input type="button" onclick="rright()" value="≫" style="font-weight: bold; font-size: 14px;">
+ | Animate from i<sub>0</sub> = <input type="text" class="width100" value="0"> to i<sub>1</sub> = <input type="text" class="width100" value="99"> at <input type="text" class="width100" value="25"> frames per second <input type="button" onclick="runani()" value="Run" style="font-weight: bold;"> <input type="button" onclick="stopani()" value="Stop" style="font-weight: bold;"></form>
+
+<table id="table" class="font"></table>
+
+<p id="debug" class="font"></p>
+
+<script src='https://cdn.plot.ly/plotly-2.24.1.min.js'></script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://unpkg.com/mathjs@15/lib/browser/math.js"></script>
+<script type="module">import FFT from "https://cdn.jsdelivr.net/npm/fft.js/+esm"; window.FFT=FFT;</script>
+    
+<script>
+    superscripts = ["¹","²","³","⁴","⁵","⁶","⁷","⁸","⁹","¹⁰","¹¹","¹²","¹³","¹⁴","¹⁵","¹⁶","¹⁷","¹⁸","¹⁹","²⁰","²¹","²²","²³","²⁴","²⁵","²⁶","²⁷","²⁸","²⁹","³⁰","³¹","³²","³³","³⁴","³⁵","³⁶","³⁷","³⁸","³⁹","⁴⁰","⁴¹","⁴²","⁴³","⁴⁴","⁴⁵","⁴⁶","⁴⁷","⁴⁸","⁴⁹","⁵⁰","⁵¹","⁵²","⁵³","⁵⁴","⁵⁵","⁵⁶","⁵⁷","⁵⁸","⁵⁹","⁶⁰","⁶¹","⁶²","⁶³","⁶⁴","⁶⁵","⁶⁶","⁶⁷","⁶⁸","⁶⁹","⁷⁰","⁷¹","⁷²","⁷³","⁷⁴","⁷⁵","⁷⁶","⁷⁷","⁷⁸","⁷⁹","⁸⁰","⁸¹","⁸²","⁸³","⁸⁴","⁸⁵","⁸⁶","⁸⁷","⁸⁸","⁸⁹","⁹⁰","⁹¹","⁹²","⁹³","⁹⁴","⁹⁵","⁹⁶","⁹⁷","⁹⁸","⁹⁹"]
+    subscripts = ["₁","₂","₃","₄","₅","₆","₇","₈","₉","₁₀","₁₁","₁₂","₁₃","₁₄","₁₅","₁₆","₁₇","₁₈","₁₉","₂₀","₂₁","₂₂","₂₃","₂₄","₂₅","₂₆","₂₇","₂₈","₂₉","₃₀","₃₁","₃₂","₃₃","₃₄","₃₅","₃₆","₃₇","₃₈","₃₉","₄₀","₄₁","₄₂","₄₃","₄₄","₄₅","₄₆","₄₇","₄₈","₄₉","₅₀","₅₁","₅₂","₅₃","₅₄","₅₅","₅₆","₅₇","₅₈","₅₉","₆₀","₆₁","₆₂","₆₃","₆₄","₆₅","₆₆","₆₇","₆₈","₆₉","₇₀","₇₁","₇₂","₇₃","₇₄","₇₅","₇₆","₇₇","₇₈","₇₉","₈₀","₈₁","₈₂","₈₃","₈₄","₈₅","₈₆","₈₇","₈₈","₈₉","₉₀","₉₁","₉₂","₉₃","₉₄","₉₅","₉₆","₉₇","₉₈","₉₉"]
+    colours = ['48,48,160,1','0,0,0,1','96,0,160,1','100,100,184,1','136,0,184,1','48,152,208,1','176,0,208,1','112,76,208,1']
+    //wavefunction, potential, wavefunction (in p), xmean, pmean, V, T, H
+    layout = {xaxis:{title:'x',titlefont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18},tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},yaxis:{tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},legend:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:14}}}
+
+    //custom functions for V and psi
+    customfunc = {gauss: (fx,fmu,fvariance,fk) => math.multiply(math.exp(-1*(fx-fmu)**2/(2*fvariance))/math.sqrt(2*math.PI*fvariance), math.exp(math.complex(0,fk*fx))),
+        step: (fx,fa,fb) => {return (fx>=fa&&fx<=fb)? 1:0},
+        box: (fx,fa,fb) => {return (fx>=fa&&fx<=fb)? 0:1}
+    }
+
+    N = 1001
+    M = 2**math.ceil(math.log2(N))
+    xmin = -3
+    xmax = 3
+    Deltax = (xmax-xmin)/(N-1)
+    Deltat = 0.01
+    Deltak = 2*Math.PI/(M*Deltax)
+    m = 1
+    alpha = 1/(2*m*Deltax**2)
+    offdiag = Deltat*alpha/2
+    vecx = createx(xmin, xmax, N)
+    vecV = createV(vecx, "1+abs(abs(x)-1/2)-abs(abs(x)+1/2)")
+    psi0 = createpsi0(vecx, "exp(-25*(x+2)^2)*exp(5*i*x)")
+    diag = creatediag(vecV)
+    psi = psi0
+    veck = []
+
+    //need to be cleaned
+    psihistory = []
+    probhistory = []
+    normhistory = [] //int rho(x,t) dx
+    xmeanhistory = [] //int x rho(x,t) dx
+    vect = []
+    psikhistory = [] //in momentum space (p=k when hbar=1)
+    probkhistory = []
+    normkhistory = []
+    kmeanhistory = [] //int k rho(k,t) dk
+    Vmeanhistory = [] //int V(x)rho(x,t) dx
+    Tmeanhistory = [] //int p^2/(2m) rho(p,t) dp
+    Hmeanhistory = [] //V+T
+
+    s = 20
+    running = 0
+    runningani = 0
+    fixed = 0
+    iterations = 0
+    stepsonce = 1000
+    anistart = 0
+    anistop = 99
+    fps = 25
+    aninow = 0
+    maxprob = 1
+
+    function updateequation() {
+        document.getElementById("equationV").innerHTML = "$$V(x)="+math.parse(document.getElementById("form").elements[0].value).toTex()+"$$"
+        document.getElementById("equationpsi").innerHTML = "$$\\psi(x,0)="+math.parse(document.getElementById("form").elements[1].value).toTex()+"$$"
+        MathJax.typeset()
+    }
+    
+    updateequation()
+
+    function createx(fxmin, fxmax, fN) { //f means temporary variables used inside functions
+        fx = new Float64Array(fN)
+        fDeltax = (fxmax-fxmin)/(fN-1)
+        for (i=0;i<fN;i++) {
+            fx[i] = fxmin+i*fDeltax
+        }
+        return fx
+    }
+
+    function createV(fvecx, fVexpr) {
+        fV = new Float64Array(fvecx.length)
+        fVexpr = math.compile(fVexpr)
+        for (i=0;i<fV.length;i++) {
+            fV[i] = fVexpr.evaluate({x: fvecx[i], ...customfunc})
+        }
+        return fV
+    }
+
+    function createpsi0(fvecx, fpsi0expr) { //complex numbers in an array are stored as [re0,im0,re1,im1,...]
+        fpsi0 = new Float64Array(2*(fvecx.length))
+        fpsi0expr = math.compile(fpsi0expr+"+i*(1e-308)")
+        for (i=0;i<fvecx.length;i++) {
+            fz = fpsi0expr.evaluate({x: fvecx[i], ...customfunc})
+            fpsi0[2*i] = fz.re
+            fpsi0[2*i+1] = fz.im
+        }
+        fpsi0[0] = 0
+        fpsi0[1] = 0
+        fpsi0[fpsi0.length-1] = 0
+        fpsi0[fpsi0.length-2] = 0
+        return normalise(fpsi0)
+    }
+
+    function L2sq(fpsi) {
+        fnorm = 0
+        for (i=0;i<fpsi.length/2;i++) {
+            fnorm += (fpsi[2*i]**2+fpsi[2*i+1]**2)
+        }
+        return fnorm*Deltax
+    }
+
+    function L2sqk(fpsik) {
+        fnorm = 0
+        for (i=0;i<fpsik.length/2;i++) {
+            fnorm += (fpsik[2*i]**2+fpsik[2*i+1]**2)
+        }
+        return fnorm*Deltak
+    }
+
+    function normalise(fpsi) {
+        fpsinorm = math.sqrt(L2sq(fpsi))
+        fpsi = fpsi.map(mav => mav/fpsinorm) //mav is the temporary variable for .map
+        return fpsi
+    }
+
+    function getprob(fpsi) {
+        fprob = []
+        for (i=0;i<fpsi.length/2;i++) {
+            fprob.push((fpsi[2*i]**2+fpsi[2*i+1]**2))
+        }
+        return fprob
+    }
+
+    function getxmean(fprob) {
+        fxmean = 0
+        for (i=0;i<fprob.length;i++) {
+            fxmean += vecx[i]*fprob[i]
+        }
+        return fxmean*Deltax
+    }
+
+    function getkmean(fprobk) {
+        fkmean = 0
+        for (i=0;i<fprobk.length;i++) {
+            fkmean += veck[i]*fprobk[i]
+        }
+        return fkmean*Deltak
+    }
+
+    function getVmean(fprob) {
+        fVmean = 0
+        for (i=0;i<fprob.length;i++) {
+            fVmean += vecV[i]*fprob[i]
+        }
+        return fVmean*Deltax
+    }
+
+    function getTmean(fprobk) {
+        fTmean = 0
+        for (i=0;i<fprobk.length;i++) { //fTmean += (veck[i]**2/(2*m))*fprobk[i]
+            fTmean += 2*(math.sin(veck[i]*Deltax/2)**2/(m*Deltax**2))*fprobk[i]
+        }
+        return fTmean*Deltak
+    }
+
+    function tomomentum(fpsi) {
+        finput = new Float64Array(2*M)
+        finput.set(fpsi)
+        foutput = fft.createComplexArray()
+        fft.transform(foutput, finput)
+        fscale = Deltax/math.sqrt(2*math.PI)
+        fpsik = new Float64Array(2*M)
+        fhalf = math.floor(M/2)
+        for (l=0;l<M;l++) {
+            fsrc = (l+fhalf)%M
+            fpsik[2*l] = foutput[2*fsrc]*fscale
+            fpsik[2*l+1] = foutput[2*fsrc+1]*fscale
+        }
+        return fpsik
+    }
+
+    function createveck() {
+        fveck = new Float64Array(M)
+        fhalf = math.floor(M/2)
+        for (l=0;l<M;l++) {
+            fveck[l] = (l-fhalf)*Deltak
+        }
+        return fveck
+    }
+
+    function creatediag(fvecV) {
+        fdiag = fvecV.map(mav => (Deltat/2)*(2*alpha+mav))
+        return fdiag
+    }
+
+    function mul(fa, fb) {
+        return [fa[0]*fb[0]-fa[1]*fb[1], fa[0]*fb[1]+fa[1]*fb[0]]
+    }
+
+    function add(fa, fb) {
+        return [fa[0]+fb[0], fa[1]+fb[1]]
+    }
+
+    function div(fa, fb) {
+        fdenom = fb[0]**2+fb[1]**2
+        return [(fa[0]*fb[0]+fa[1]*fb[1])/fdenom, (fa[1]*fb[0]-fa[0]*fb[1])/fdenom]
+    }
+
+    function computed(fdiag, fpsin) { //this gives an array with four fewer entries (two less complex values)
+        fd = new Float64Array(fpsin.length-4)
+        fd0 = add(mul([1,-fdiag[1]], [fpsin[2],fpsin[3]]), [-offdiag*fpsin[5], offdiag*fpsin[4]])
+        fd[0] = fd0[0]
+        fd[1] = fd0[1]
+        for (i=1;i<fd.length/2-1;i++) {
+            fdi = add(add([-offdiag*fpsin[2*i+1], offdiag*fpsin[2*i]], mul([1,-fdiag[i+1]], [fpsin[2*i+2],fpsin[2*i+3]])), [-offdiag*fpsin[2*i+5], offdiag*fpsin[2*i+4]])
+            fd[2*i] = fdi[0]
+            fd[2*i+1] = fdi[1]
+        }
+        fI = (fd.length/2)-1
+        fdn = add([-offdiag*fpsin[2*fI+1], offdiag*fpsin[2*fI]], mul([1,-fdiag[fI+1]], [fpsin[2*fI+2],fpsin[2*fI+3]]))
+        fd[2*fI] = fdn[0]
+        fd[2*fI+1] = fdn[1]
+        return fd
+    }
+
+    function onestep(fdiag, fpsi) {
+        fbbefore = fdiag.slice(1,-1)
+        fb = new Float64Array(2*fbbefore.length)
+        for (i=0;i<fbbefore.length;i++) { //creating the b_i's
+            fb[2*i] = 1
+            fb[2*i+1] = fbbefore[i]
+        }
+        fd = computed(fdiag, fpsi)
+        for (i=2;i<=N-2;i++) { //n = N-2 in the wikipedia page for the Thomas algorithm
+            fw = div([0,-offdiag], [fb[2*i-4],fb[2*i-3]])
+            fb[2*i-2] -= offdiag*fw[1]
+            fb[2*i-1] -= (-offdiag*fw[0])
+            fwd = mul(fw, [fd[2*i-4],fd[2*i-3]])
+            fd[2*i-2] -= fwd[0]
+            fd[2*i-1] -= fwd[1]
+        }
+        fx = new Float64Array(fpsi.length) //x here is full length (2*N instead of 2*N-4)
+        fxn = div([fd[fd.length-2],fd[fd.length-1]], [fb[fb.length-2],fb[fb.length-2]])
+        fx[fx.length-4] = fxn[0]
+        fx[fx.length-3] = fxn[1]
+        for (i=N-3;i>=1;i--) {
+            fxi = div([fd[2*i-2]-offdiag*fx[2*i+3], fd[2*i-1]+offdiag*fx[2*i+2]], [fb[2*i-2],fb[2*i-1]])
+            fx[2*i] = fxi[0]
+            fx[2*i+1] = fxi[1]
+        }
+        return fx
+    }
+    
+    function run() {
+        if (running==0) {
+        if (fixed==0) {
+            N = eval(document.getElementById("form").elements[5].value)
+            M = 2**math.ceil(math.log2(N))
+            fft = new FFT(M)
+            xmin = eval(document.getElementById("form").elements[3].value)
+            xmax = eval(document.getElementById("form").elements[4].value)
+            Deltax = (xmax-xmin)/(N-1)
+            Deltat = eval(document.getElementById("form").elements[7].value)/eval(document.getElementById("form").elements[6].value)
+            Deltak = 2*Math.PI/(M*Deltax)
+            m = eval(document.getElementById("form").elements[2].value)
+            alpha = 1/(2*m*Deltax**2)
+            offdiag = Deltat*alpha/2
+            vecx = createx(xmin, xmax, N)
+            vecV = createV(vecx, document.getElementById("form").elements[0].value)
+            psi0 = createpsi0(vecx, document.getElementById("form").elements[1].value)
+            diag = creatediag(vecV)
+            psi = psi0
+            veck = createveck()
+            s = eval(document.getElementById("form").elements[6].value)
+        }
+        fixed = 1
+        stopani()
+        stepsonce = eval(document.getElementById("form").elements[8].value)
+        theinterval = setInterval(runonce,eval(document.getElementById("form").elements[9].value)*1000)
+        running = 1
+        }
+    }
+
+    function stop() {
+        if (running==1) {
+            clearInterval(theinterval)
+            document.getElementById("stats").innerHTML = document.getElementById("stats").innerHTML.replace("Running","Stopped")
+        }
+        running = 0
+    }
+
+    function clean() {
+        if (running==0) {
+            fixed = 0
+            iterations = 0
+            psihistory = []
+            probhistory = []
+            normhistory = []
+            xmeanhistory = []
+            vect = []
+            psikhistory = []
+            probkhistory = []
+            normkhistory = []
+            kmeanhistory = []
+            Vmeanhistory = []
+            Tmeanhistory = []
+            Hmeanhistory = []
+            stopani()
+            document.getElementById("table").innerHTML = ""
+            document.getElementById("info").innerHTML = ""
+            document.getElementById("stats").innerHTML = ""
+            Plotly.purge("achart")
+        }
+    }
+
+    function runonce() {
+        document.getElementById("stats").innerHTML = "Running   | " + iterations + " steps at t = " + Number((iterations*Deltat).toPrecision(12))
+        for (j=iterations;j<iterations+stepsonce;j++) { //using j since i is used in onestep()
+            if (j%s==0) {
+                psihistory.push(psi)
+                latestprob = getprob(psi)
+                probhistory.push(latestprob)
+                normhistory.push(L2sq(psi))
+                xmeanhistory.push(getxmean(latestprob))
+                vect.push(Number((j*Deltat).toPrecision(12)))
+                latestpsik = tomomentum(psi)
+                latestprobk = getprob(latestpsik)
+                psikhistory.push(latestpsik)
+                probkhistory.push(latestprobk)
+                normkhistory.push(L2sqk(latestpsik))
+                kmeanhistory.push(getkmean(latestprobk))
+                latestV = getVmean(latestprob)
+                latestT = getTmean(latestprobk)
+                Vmeanhistory.push(latestV)
+                Tmeanhistory.push(latestT)
+                Hmeanhistory.push(latestV+latestT)
+                plotrho(j/s-1)
+                set()
+            }
+            psi = onestep(diag, psi)
+        }
+        plotrho(psihistory.length-1)
+        iterations += stepsonce
+    }
+
+    function set() {
+        fi0 = eval(document.getElementById("settings").elements[0].value)
+        fi1 = eval(document.getElementById("settings").elements[1].value)
+        if (fi1-fi0>0 && fi1>=0 && fi0<=(psihistory.length-1)) {
+            updatetable(math.max(0,fi0), math.min(psihistory.length,fi1+1)-1)
+        }
+    }
+
+    function right() {
+        fdist = eval(document.getElementById("settings").elements[1].value)-eval(document.getElementById("settings").elements[0].value)+1
+        if (eval(document.getElementById("settings").elements[0].value)+fdist<psihistory.length) {
+            document.getElementById("settings").elements[0].value = eval(document.getElementById("settings").elements[0].value)+fdist
+            document.getElementById("settings").elements[1].value = eval(document.getElementById("settings").elements[1].value)+fdist
+            set()
+        }
+    }
+
+    function left() {
+        fdist = eval(document.getElementById("settings").elements[1].value)-eval(document.getElementById("settings").elements[0].value)+1
+        document.getElementById("settings").elements[0].value = math.max(eval(document.getElementById("settings").elements[0].value)-fdist,0)
+        document.getElementById("settings").elements[1].value = eval(document.getElementById("settings").elements[0].value)+fdist-1
+        set()
+    }
+
+    function rright() {
+        fdist = eval(document.getElementById("settings").elements[1].value)-eval(document.getElementById("settings").elements[0].value)+1
+        document.getElementById("settings").elements[0].value = math.floor((psihistory.length-1)/fdist)*fdist
+        document.getElementById("settings").elements[1].value = eval(document.getElementById("settings").elements[0].value)+fdist-1
+        set()
+    }
+
+    function lleft() {
+        fdist = eval(document.getElementById("settings").elements[1].value)-eval(document.getElementById("settings").elements[0].value)+1
+        document.getElementById("settings").elements[0].value = 0
+        document.getElementById("settings").elements[1].value = fdist-1
+        set()
+    }
+
+    function formatcomplex(fRe, fIm) {
+        if (fIm>=0) {
+            fmid = "+"
+        } else {
+            fmid = "-"
+        }
+        return String(fRe)+fmid+"i*"+String(math.abs(fIm))
+    }
+
+    function updatetable(fstart, fstop) { //fstart to fstop inclusive
+        heading = "<tr><th style=\"padding-top: 8px;\">i</th><th>t<sub>i</sub></th><th>⟨x⟩ <input type=\"button\" style=\"font-size: 12px;margin: 0px 0px;font-weight: bold;\" onclick=\"plotxmean()\" value=\"Plot\"></th><th>⟨p⟩ <input type=\"button\" style=\"font-size: 12px;margin: 0px 0px;font-weight: bold;\" onclick=\"plotkmean()\" value=\"Plot\"></th>"
+        heading += "<th>[⟨V⟩, ⟨T⟩, ⟨H⟩] <input type=\"button\" style=\"font-size: 12px;margin: 0px 0px;font-weight: bold;\" onclick=\"plotvth()\" value=\"Plot\"></th>"
+        heading += "<th>ρ(x,t)</th><th>ρ(p,t)</th><th>ψ(x,t)</th><th>ϕ(p,t)</th></tr>"
+        for (i=fstart;i<=fstop;i++) {
+            heading += "<tr><td>" +i+ "</td><td>" + Number((i*s*Deltat).toPrecision(12)) + "</td>"
+            heading += "<td>" +xmeanhistory[i]+ "</td>"
+            heading += "<td>" +kmeanhistory[i]+ "</td>"
+            heading += "<td>[" +Vmeanhistory[i]+", "+Tmeanhistory[i]+", "+Hmeanhistory[i]+ "]</td>"
+            heading += "<td><input type=\"button\" style=\"font-size: 12px;margin: 0px 0px;font-weight: bold;\" onclick=\"plotrho(" + i + ")\" value=\"Plot\"> [0, " +probhistory[i][1]+ ", ...] with ∫ = " +normhistory[i]+ "</td>"
+            heading += "<td><input type=\"button\" style=\"font-size: 12px;margin: 0px 0px;font-weight: bold;\" onclick=\"plotrhok(" + i + ")\" value=\"Plot\"> [0, " +probkhistory[i][1]+ ", ...] with ∫ = " +normkhistory[i]+ "</td>"
+            heading += "<td>[0, " +formatcomplex(psihistory[i][2],psihistory[i][3])+ ", ...]</td>"
+            heading += "<td>[0, " +formatcomplex(psikhistory[i][2],psikhistory[i][3])+ ", ...]</td></tr>"
+        }
+        document.getElementById("table").innerHTML = heading
+    }
+
+    function plotrho(fi) {
+        data = [{x: vecx, y: probhistory[fi],
+            type: 'scatter', mode: 'lines+markers', name: ("ρ(x,t<sub>"+fi+"</sub>)"),
+            marker: {color: 'rgba(' + colours[0] + ')'}, line: {color: 'rgba(' + colours[0] + ')',
+                shape: 'spline', smoothness: 0.5}
+        }]
+        Plotly.newPlot("achart",data,eval(layout))
+    }
+
+    function plotrhok(fi) {
+        data = [{x: veck, y: probkhistory[fi],
+            type: 'scatter', mode: 'lines+markers', name: ("ρ(p,t<sub>"+fi+"</sub>)"),
+            marker: {color: 'rgba(' + colours[2] + ')'}, line: {color: 'rgba(' + colours[2] + ')',
+                shape: 'spline', smoothness: 0.5}
+        }]
+        Plotly.newPlot("achart",data,{xaxis:{title:'p',titlefont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18},tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},yaxis:{tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},legend:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:14}}})
+    }
+
+    function plotxmean() {
+        data = [{x: vect, y: xmeanhistory,
+            type: 'scatter', mode: 'lines+markers', name: ("⟨x⟩"),
+            marker: {color: 'rgba(' + colours[3] + ')'}, line: {color: 'rgba(' + colours[3] + ')',
+                shape: 'spline', smoothness: 0.5}
+        }]
+        Plotly.newPlot("achart",data,{xaxis:{title:'t',titlefont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18},tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},yaxis:{tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},legend:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:14}}})
+    }
+
+    function plotkmean() {
+        data = [{x: vect, y: kmeanhistory,
+            type: 'scatter', mode: 'lines+markers', name: ("⟨p⟩"),
+            marker: {color: 'rgba(' + colours[4] + ')'}, line: {color: 'rgba(' + colours[4] + ')',
+                shape: 'spline', smoothness: 0.5}
+        }]
+        Plotly.newPlot("achart",data,{xaxis:{title:'t',titlefont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18},tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},yaxis:{tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},legend:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:14}}})
+    }
+
+    function plotvth() {
+        data = [{x: vect, y: Vmeanhistory,
+            type: 'scatter', mode: 'lines+markers', name: ("⟨V⟩"),
+            marker: {color: 'rgba(' + colours[5] + ')'}, line: {color: 'rgba(' + colours[5] + ')',
+                shape: 'spline', smoothness: 0.5}
+        },{x: vect, y: Tmeanhistory,
+            type: 'scatter', mode: 'lines+markers', name: ("⟨T⟩"),
+            marker: {color: 'rgba(' + colours[6] + ')'}, line: {color: 'rgba(' + colours[6] + ')',
+                shape: 'spline', smoothness: 0.5}
+        },{x: vect, y: Hmeanhistory,
+            type: 'scatter', mode: 'lines+markers', name: ("⟨H⟩"),
+            marker: {color: 'rgba(' + colours[7] + ')'}, line: {color: 'rgba(' + colours[7] + ')',
+                shape: 'spline', smoothness: 0.5}
+        }]
+        Plotly.newPlot("achart",data,{xaxis:{title:'t',titlefont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18},tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},yaxis:{tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},legend:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:14}}})
+    }
+
+    function runani() {
+        if (runningani==0) {
+            anistart = eval(document.getElementById("settings").elements[7].value)
+            anistop = eval(document.getElementById("settings").elements[8].value)
+            fps = eval(document.getElementById("settings").elements[9].value)
+            if (anistop>=anistart && anistart>=0 && anistop<=(probhistory.length-1)) {
+                stop()
+                aninow = anistart
+                maxprob = 0
+                for (k=anistart;k<=anistop;k++) {
+                    maxprob = math.max(...probhistory[k],maxprob)
+                }
+                aniinterval = setInterval(aniframe,1000/fps)
+                runningani = 1
+            }
+        }
+    }
+
+    function stopani() {
+        if (runningani==1) {
+            clearInterval(aniinterval)
+            runningani = 0
+        }
+    }
+
+    function aniframe() {
+        plotani(aninow)
+        aninow += 1
+        if (aninow>anistop) {
+            clearInterval(aniinterval)
+            runningani = 0
+        }
+    }
+
+    function plotani(fi) {
+        data = [{x: vecx, y: probhistory[fi],
+            type: 'scatter', mode: 'lines+markers', name: ("ρ(x,t<sub>"+fi+"</sub>)"), yaxis:'y',
+            marker: {color: 'rgba(' + colours[0] + ')'}, line: {color: 'rgba(' + colours[0] + ')',
+                shape: 'spline', smoothness: 0.5}
+        },{x: vecx, y: vecV,
+            type: 'scatter', mode: 'lines+markers', name: ("V(x)"), yaxis:'y2',
+            marker: {color: 'rgba(' + colours[1] + ')'}, line: {color: 'rgba(' + colours[1] + ')',
+                shape: 'spline', smoothness: 0.5}
+        }]
+        layoutani = {xaxis:{title:'x',titlefont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18},tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},
+        yaxis:{title:'ρ',side:'left',range:[-maxprob*(139/2202),maxprob*(1+139/2202)],titlefont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18},tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},
+        yaxis2:{title:'V',side:'right',overlaying:'y',titlefont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18},tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},legend:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:14}}}
+        Plotly.newPlot("achart",data,eval(layoutani))
+    }
+
+</script>
+</body>
+</html>
