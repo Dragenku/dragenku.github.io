@@ -83,8 +83,8 @@ Steps within one t<sub>i</sub> = <input type="text" class="width100" value="500"
 <script>
     superscripts = ["¹","²","³","⁴","⁵","⁶","⁷","⁸","⁹","¹⁰","¹¹","¹²","¹³","¹⁴","¹⁵","¹⁶","¹⁷","¹⁸","¹⁹","²⁰","²¹","²²","²³","²⁴","²⁵","²⁶","²⁷","²⁸","²⁹","³⁰","³¹","³²","³³","³⁴","³⁵","³⁶","³⁷","³⁸","³⁹","⁴⁰","⁴¹","⁴²","⁴³","⁴⁴","⁴⁵","⁴⁶","⁴⁷","⁴⁸","⁴⁹","⁵⁰","⁵¹","⁵²","⁵³","⁵⁴","⁵⁵","⁵⁶","⁵⁷","⁵⁸","⁵⁹","⁶⁰","⁶¹","⁶²","⁶³","⁶⁴","⁶⁵","⁶⁶","⁶⁷","⁶⁸","⁶⁹","⁷⁰","⁷¹","⁷²","⁷³","⁷⁴","⁷⁵","⁷⁶","⁷⁷","⁷⁸","⁷⁹","⁸⁰","⁸¹","⁸²","⁸³","⁸⁴","⁸⁵","⁸⁶","⁸⁷","⁸⁸","⁸⁹","⁹⁰","⁹¹","⁹²","⁹³","⁹⁴","⁹⁵","⁹⁶","⁹⁷","⁹⁸","⁹⁹"]
     subscripts = ["₁","₂","₃","₄","₅","₆","₇","₈","₉","₁₀","₁₁","₁₂","₁₃","₁₄","₁₅","₁₆","₁₇","₁₈","₁₉","₂₀","₂₁","₂₂","₂₃","₂₄","₂₅","₂₆","₂₇","₂₈","₂₉","₃₀","₃₁","₃₂","₃₃","₃₄","₃₅","₃₆","₃₇","₃₈","₃₉","₄₀","₄₁","₄₂","₄₃","₄₄","₄₅","₄₆","₄₇","₄₈","₄₉","₅₀","₅₁","₅₂","₅₃","₅₄","₅₅","₅₆","₅₇","₅₈","₅₉","₆₀","₆₁","₆₂","₆₃","₆₄","₆₅","₆₆","₆₇","₆₈","₆₉","₇₀","₇₁","₇₂","₇₃","₇₄","₇₅","₇₆","₇₇","₇₈","₇₉","₈₀","₈₁","₈₂","₈₃","₈₄","₈₅","₈₆","₈₇","₈₈","₈₉","₉₀","₉₁","₉₂","₉₃","₉₄","₉₅","₉₆","₉₇","₉₈","₉₉"]
-    colours = ['48,48,160,1','0,0,0,1','96,0,160,1','100,100,184,1','136,0,184,1','48,152,208,1','176,0,208,1','112,76,208,1']
-    //wavefunction, potential, wavefunction (in p), xmean, pmean, V, T, H
+    colours = ['48,48,160,1','0,0,0,1','96,0,160,1','100,100,184,1','136,0,184,1','48,152,208,1','176,0,208,1','112,76,208,1','118,50,184,1']
+    //          wavefunction, potential, wavefunction (in p), xmean, pmean,          V,              T,           H,         uncertainty
     layout = {xaxis:{title:'x',titlefont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18},tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},yaxis:{tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},legend:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:14}}}
 
     //custom functions for V and psi
@@ -115,13 +115,14 @@ Steps within one t<sub>i</sub> = <input type="text" class="width100" value="500"
     probhistory = []
     normhistory = [] //int rho(x,t) dx
     xmeanhistory = [] //int x rho(x,t) dx
+    uncerthistory = [] //sigma_x *sigma_p where sigma denotes standard variation 
     vect = []
     psikhistory = [] //in momentum space (p=k when hbar=1)
     probkhistory = []
     normkhistory = []
     kmeanhistory = [] //int k rho(k,t) dk
     Vmeanhistory = [] //int V(x)rho(x,t) dx
-    Tmeanhistory = [] //int p^2/(2m) rho(p,t) dp
+    Tmeanhistory = [] //int p^2/(2m) rho(x,t) dx with p being the momentum operator
     Hmeanhistory = [] //V+T
 
     s = 20
@@ -215,12 +216,28 @@ Steps within one t<sub>i</sub> = <input type="text" class="width100" value="500"
         return fxmean*Deltax
     }
 
+    function getxsqmean(fprob) {
+        fxsqmean = 0
+        for (i=0;i<fprob.length;i++) {
+            fxsqmean += (vecx[i]**2)*fprob[i]
+        }
+        return fxsqmean*Deltax
+    }
+
     function getkmean(fprobk) {
         fkmean = 0
         for (i=0;i<fprobk.length;i++) {
             fkmean += veck[i]*fprobk[i]
         }
         return fkmean*Deltak
+    }
+
+    function getksqmean(fprobk) {
+        fksqmean = 0
+        for (i=0;i<fprobk.length;i++) {
+            fksqmean += (veck[i]**2)*fprobk[i]
+        }
+        return fksqmean*Deltak
     }
 
     function getVmean(fprob) {
@@ -373,6 +390,7 @@ Steps within one t<sub>i</sub> = <input type="text" class="width100" value="500"
             probhistory = []
             normhistory = []
             xmeanhistory = []
+            uncerthistory = []
             vect = []
             psikhistory = []
             probkhistory = []
@@ -395,21 +413,24 @@ Steps within one t<sub>i</sub> = <input type="text" class="width100" value="500"
             if (j%s==0) {
                 psihistory.push(psi)
                 latestprob = getprob(psi)
+                latestxmean = getxmean(latestprob)
                 probhistory.push(latestprob)
                 normhistory.push(L2sq(psi))
-                xmeanhistory.push(getxmean(latestprob))
+                xmeanhistory.push(latestxmean)
                 vect.push(Number((j*Deltat).toPrecision(12)))
                 latestpsik = tomomentum(psi)
                 latestprobk = getprob(latestpsik)
                 psikhistory.push(latestpsik)
                 probkhistory.push(latestprobk)
                 normkhistory.push(L2sqk(latestpsik))
-                kmeanhistory.push(getkmean(latestprobk))
+                latestkmean = getkmean(latestprobk)
+                kmeanhistory.push(latestkmean)
                 latestV = getVmean(latestprob)
                 latestT = getTmean(latestprobk)
                 Vmeanhistory.push(latestV)
                 Tmeanhistory.push(latestT)
                 Hmeanhistory.push(latestV+latestT)
+                uncerthistory.push(math.sqrt(getxsqmean(latestprob)- latestxmean**2)* math.sqrt(getksqmean(latestprobk)- latestkmean**2))
                 plotrho(j/s-1)
                 set()
             }
@@ -469,12 +490,14 @@ Steps within one t<sub>i</sub> = <input type="text" class="width100" value="500"
     function updatetable(fstart, fstop) { //fstart to fstop inclusive
         heading = "<tr><th style=\"padding-top: 8px;\">i</th><th>t<sub>i</sub></th><th>⟨x⟩ <input type=\"button\" style=\"font-size: 12px;margin: 0px 0px;font-weight: bold;\" onclick=\"plotxmean()\" value=\"Plot\"></th><th>⟨p⟩ <input type=\"button\" style=\"font-size: 12px;margin: 0px 0px;font-weight: bold;\" onclick=\"plotkmean()\" value=\"Plot\"></th>"
         heading += "<th>[⟨V⟩, ⟨T⟩, ⟨H⟩] <input type=\"button\" style=\"font-size: 12px;margin: 0px 0px;font-weight: bold;\" onclick=\"plotvth()\" value=\"Plot\"></th>"
+        heading += "<th>σ<sub>x</sub>σ<sub>p</sub> <input type=\"button\" style=\"font-size: 12px;margin: 0px 0px;font-weight: bold;\" onclick=\"plotuncert()\" value=\"Plot\"></th>"
         heading += "<th>ρ(x,t)</th><th>ρ(p,t)</th><th>ψ(x,t)</th><th>ϕ(p,t)</th></tr>"
         for (i=fstart;i<=fstop;i++) {
             heading += "<tr><td>" +i+ "</td><td>" + Number((i*s*Deltat).toPrecision(12)) + "</td>"
             heading += "<td>" +xmeanhistory[i]+ "</td>"
             heading += "<td>" +kmeanhistory[i]+ "</td>"
             heading += "<td>[" +Vmeanhistory[i]+", "+Tmeanhistory[i]+", "+Hmeanhistory[i]+ "]</td>"
+            heading += "<td>" +uncerthistory[i]+ "</td>"
             heading += "<td><input type=\"button\" style=\"font-size: 12px;margin: 0px 0px;font-weight: bold;\" onclick=\"plotrho(" + i + ")\" value=\"Plot\"> [0, " +probhistory[i][1]+ ", ...] with ∫ = " +normhistory[i]+ "</td>"
             heading += "<td><input type=\"button\" style=\"font-size: 12px;margin: 0px 0px;font-weight: bold;\" onclick=\"plotrhok(" + i + ")\" value=\"Plot\"> [0, " +probkhistory[i][1]+ ", ...] with ∫ = " +normkhistory[i]+ "</td>"
             heading += "<td>[0, " +formatcomplex(psihistory[i][2],psihistory[i][3])+ ", ...]</td>"
@@ -531,6 +554,15 @@ Steps within one t<sub>i</sub> = <input type="text" class="width100" value="500"
         },{x: vect, y: Hmeanhistory,
             type: 'scatter', mode: 'lines+markers', name: ("⟨H⟩"),
             marker: {color: 'rgba(' + colours[7] + ')'}, line: {color: 'rgba(' + colours[7] + ')',
+                shape: 'spline', smoothness: 0.5}
+        }]
+        Plotly.newPlot("achart",data,{xaxis:{title:'t',titlefont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18},tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},yaxis:{tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},legend:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:14}}})
+    }
+
+    function plotuncert() {
+        data = [{x: vect, y: uncerthistory,
+            type: 'scatter', mode: 'lines+markers', name: ("σ<sub>x</sub>σ<sub>p</sub>"),
+            marker: {color: 'rgba(' + colours[8] + ')'}, line: {color: 'rgba(' + colours[8] + ')',
                 shape: 'spline', smoothness: 0.5}
         }]
         Plotly.newPlot("achart",data,{xaxis:{title:'t',titlefont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18},tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},yaxis:{tickfont:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:16},exponentformat:'power',showexponent:'all'},legend:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:18}},showlegend:true,hoverlabel:{font:{family:'"Lucida Sans Unicode", "Lucida Grande", sans-serif',size:14}}})
