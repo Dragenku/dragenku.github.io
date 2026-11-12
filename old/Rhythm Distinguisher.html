@@ -1,0 +1,113 @@
+<html>
+<body>
+
+<style> table, th, td {border: 1px solid black;} </style>
+
+<input type="button" onclick="startf()" value="Start">
+<input type="button" onclick="stopf()" value="Stop">
+<br>
+<p id="statusid"></p>
+<input type="button" onclick="tapf()" value="Tap">
+<br><br>
+<table id="tableid"></table>
+
+<p id="tapsid"></p>
+
+<p id="infoid"></p>
+
+<script>
+    document.getElementById("statusid").innerHTML = "Not recording"
+    var active = 0
+    var rawdata = []
+    var rawrawdata = []
+    var taps = 0
+    var m1min = 0
+    var m1results = []
+    var m1error = []
+    var notenumber = 0
+    var m2min = 0
+    var m2singleresult = 0
+    var m2startingguess = 50
+    var m2error = 0
+    var m2besterror = 100
+    var m2bestguess = 0
+    var m2results = []
+    var m2finalerror = []
+    var m3min = 0
+    var m3singleresult = 0
+    var m3startingguess = 50
+    var m3error = 0
+    var m3besterror = 100
+    var m3bestguess = 0
+    var m3results = []
+    var m3finalerror = []
+    document.getElementById("tableid").innerHTML += "<tr><th>Note</th><th>Raw data</th><th>Method 1</th><th>Method 2A</th><th>Method 2B</th></tr>"
+    function startf() {
+        active = 1
+        document.getElementById("statusid").innerHTML = "Recording..."
+    }
+    function stopf() {
+        if (active == 1) {
+        document.getElementById("statusid").innerHTML = "Stopped recording (reload to reset)"
+        for (i = 0; i < taps-1; i++) {
+            rawdata.push(rawrawdata[i+1]-rawrawdata[i])
+        } /*method 1 below*/
+        m1min = Math.min.apply(Math,rawdata)
+        for (i = 0; i < taps-1; i++) {
+            m1results.push(Math.round(rawdata[i]/m1min))
+            m1error.push(100*(rawdata[i]-m1min*m1results[i])/rawdata[i])
+        } /*method 2a (or method 2) below */
+        m2min = Math.min.apply(Math,rawdata)
+        for (m2guess = m2startingguess; m2guess <= 1.5*m2min; m2guess++) {
+            for (i = 0; i < taps-1; i++) {
+                m2singleresult = Math.round(rawdata[i]/m2guess)
+                m2error += Math.abs(100*(rawdata[i]-m2guess*m2singleresult)/rawdata[i]/m2guess)
+            }
+        if (m2error < m2besterror) {
+            m2besterror = m2error
+            m2bestguess = m2guess}
+        m2error = 0
+        }
+        for (i = 0; i < taps-1; i++) {
+            m2results.push(Math.round(rawdata[i]/m2bestguess))
+            m2finalerror.push(100*(rawdata[i]-m2bestguess*m2results[i])/rawdata[i])}
+        /*method 2b (or method 3) below*/
+        m3min = Math.min.apply(Math,rawdata)
+        for (m3guess = m3startingguess; m3guess <= 1.5*m3min; m3guess++) {
+            for (i = 0; i < taps-1; i++) {
+                m3singleresult = Math.round(rawdata[i]/m3guess)
+                m3error += Math.abs(100*(rawdata[i]-m3guess*m3singleresult)/rawdata[i])
+            }
+        if (m3error < m3besterror) {
+            m3besterror = m3error
+            m3bestguess = m3guess}
+        m3error = 0
+        }
+        for (i = 0; i < taps-1; i++) {
+            m3results.push(Math.round(rawdata[i]/m3bestguess))
+            m3finalerror.push(100*(rawdata[i]-m3bestguess*m3results[i])/rawdata[i])}
+        /* finishing */
+        document.getElementById("tableid").innerHTML += "<tr><th></th><th>(1 ms)</th><th>(" + m1min + " ms)</th><th>("+m2bestguess+" ms)</th><th>("+m3bestguess+" ms)</tr>"
+        for (i = 0; i < taps-1; i++) {
+            notenumber = i+1
+            document.getElementById("tableid").innerHTML += "<tr><td>" + notenumber + "</td><td>" + rawdata[i] + "</td><td>" + m1results[i] + " (" + Math.round(10*m1error[i])/10 + "%)</td><td>" + m2results[i] + " (" + Math.round(10*m2finalerror[i])/10 + "%)</td><td>" + m3results[i] + " (" + Math.round(10*m3finalerror[i])/10 + "%)</td></tr>"
+        }
+                document.getElementById("infoid").innerHTML = "Method 2A: "+Math.round(10*m2besterror*m2bestguess)/10+"% ("+Math.round(10000*m2besterror)/10000+"%); Method 2B: "+Math.round(10*m3besterror)/10+"% ("+Math.round(10000*m3besterror/m3bestguess)/10000+"%)"
+        }
+        active = 2
+    }
+    function tapf() {
+        if (active == 1) {
+            taps += 1
+            const d = new Date()
+            rawrawdata.push(d.getTime())
+        }
+    }
+    function debugf() {
+        document.getElementById("tapsid").innerHTML = taps + " taps"
+    }
+    setInterval("debugf()",12)
+</script>
+
+</body>
+</html>
